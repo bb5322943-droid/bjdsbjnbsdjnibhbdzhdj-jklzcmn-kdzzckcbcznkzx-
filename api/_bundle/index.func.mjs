@@ -648,7 +648,7 @@ var BASE_TABLES = {
 	]
 };
 /** Soft-delete qo'llab-quvvatlaydigan jadvallar — ularga `deletedAt` ustuni qo'shiladi. */
-var SOFT_DELETE_TABLES = /* @__PURE__ */ new Set([
+var SOFT_DELETE_TABLES = new Set([
 	"transactions",
 	"employees",
 	"products",
@@ -672,7 +672,7 @@ var SOFT_DELETE_TABLES = /* @__PURE__ */ new Set([
 */
 var TABLES = Object.fromEntries(Object.entries(BASE_TABLES).map(([table, columns]) => [table, SOFT_DELETE_TABLES.has(table) ? [...columns, "deletedAt"] : columns]));
 /** JSON sifatida saqlanadigan ustunlar — o'qishda qayta parse qilinadi. */
-var JSON_COLUMNS = /* @__PURE__ */ new Set(["items"]);
+var JSON_COLUMNS = new Set(["items"]);
 /**
 * SQLite faqat null/number/bigint/string/Uint8Array qabul qiladi.
 * Obyekt va massivlar JSON'ga, `undefined` esa null'ga aylantiriladi.
@@ -3578,7 +3578,6 @@ var getStockMovements = (req, res) => {
 	res.json(paginate(filtered, query.page, query.limit));
 };
 var adjustSchema = z.object({
-	/** Musbat — kirim, manfiy — chiqim. */
 	delta: z.coerce.number().int().refine((value) => value !== 0, "o'zgarish nolga teng bo'lmasligi kerak"),
 	reason: z.string().trim().min(1, "sabab kiritilishi shart")
 });
@@ -5283,7 +5282,6 @@ var userSchema = z.object({
 	role: z.enum(USER_ROLES),
 	employeeId: z.string().trim().nullable().optional(),
 	status: z.enum(["active", "suspended"]).optional(),
-	/** Faqat yangi hisob ochishda; berilmasa boshlang'ich parol qo'yiladi. */
 	password: passwordSchema.optional()
 });
 /** Yangi hisob uchun boshlang'ich parol — foydalanuvchi keyin o'zgartiradi. */
@@ -6261,10 +6259,16 @@ function createServer() {
 		contentSecurityPolicy: false,
 		crossOriginEmbedderPolicy: false
 	}));
-	const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:5173", "http://localhost:8080"];
+	const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
+		"http://localhost:5173",
+		"http://localhost:8080",
+		"http://localhost:8081"
+	];
 	app.use(cors({
 		origin: (origin, callback) => {
-			if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+			if (!origin) return callback(null, true);
+			const isVercelDomain = origin.includes(".vercel.app") || origin.includes("vercel.com");
+			if (allowedOrigins.includes(origin) || isVercelDomain) callback(null, true);
 			else {
 				logger.warn(`CORS blocked origin: ${origin}`);
 				callback(/* @__PURE__ */ new Error("CORS policy: Origin not allowed"));

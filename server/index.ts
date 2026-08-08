@@ -243,6 +243,7 @@ export function createServer() {
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
     "http://localhost:5173",
     "http://localhost:8080",
+    "http://localhost:8081",
   ];
 
   app.use(
@@ -252,7 +253,16 @@ export function createServer() {
         if (!origin && process.env.NODE_ENV !== "production") {
           return callback(null, true);
         }
-        if (!origin || allowedOrigins.includes(origin)) {
+        
+        // Vercel deployment: agar origin yo'q bo'lsa (serverless), ruxsat ber
+        if (!origin) {
+          return callback(null, true);
+        }
+        
+        // Vercel preview deployments va production uchun
+        const isVercelDomain = origin.includes('.vercel.app') || origin.includes('vercel.com');
+        
+        if (allowedOrigins.includes(origin) || isVercelDomain) {
           callback(null, true);
         } else {
           logger.warn(`CORS blocked origin: ${origin}`);

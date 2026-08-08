@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm install && npm run build:vercel",
-  "outputDirectory": "dist/spa",
+  "buildCommand": "pnpm install && pnpm run build:vercel",
+  "outputDirectory": ".vercel/output",
   "framework": null,
-  "installCommand": "npm install",
+  "installCommand": "pnpm install",
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -20,8 +20,40 @@
         {
           "key": "Cache-Control",
           "value": "no-store, must-revalidate"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
