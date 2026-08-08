@@ -1,0 +1,87 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.config/
+!.env.example
+
+# Environment variables (MUHIM: .env ni commit qilmang!)
+.env
+.env.local
+.env.production
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# SQLite ma'lumotlar bazasi (mahalliy holat)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Backup files
+backups/
+*.backup
+
+# Vercel
+.vercel
+
+# Eski/ishlatilmaydigan nusxa va vaqtinchalik fayllar
+om bor/
+_ui-test-temp.mjs
+
+# Security
+*.pem
+*.key
+*.cert
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS specific
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# PM2 logs
+.pm2/
+pids/
+*.pid
+*.seed
+
+# Sensitive data
+secrets/
+credentials/
+*.secret
+
+.vercel
+
+!server/data/
+!server/data/store.ts
