@@ -1,0 +1,54 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Build artifacts
+dist
+.cache
+
+# Environment
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Git
+.git
+.github
+.gitignore
+
+# Database
+data
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs
+*.log
+
+# Backups
+backups
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.zip
+vercel-deploy

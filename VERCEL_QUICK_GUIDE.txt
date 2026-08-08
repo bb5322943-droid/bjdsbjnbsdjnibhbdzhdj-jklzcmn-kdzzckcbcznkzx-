@@ -1,0 +1,138 @@
+╔═══════════════════════════════════════════════════════════╗
+║          VERCEL DEPLOY - TEZKOR QO'LLANMA               ║
+╚═══════════════════════════════════════════════════════════╝
+
+📋 HOZIR VERCEL SAHIFASIDA QILING:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. REPOSITORY URL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GitHub repository URL ni kiriting yoki "fusion-erp" ni toping:
+https://github.com/shodiyorfozilov18-glitch/fusion-erp
+
+"Import" tugmasini bosing.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. BUILD SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project Name: fusion-erp (yoki o'zingizniki)
+Framework Preset: Other
+Root Directory: ./
+
+Build Command:
+pnpm run build:vercel
+
+Output Directory:
+dist/spa
+
+Install Command:
+pnpm install
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. ENVIRONMENT VARIABLES (11 ta)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Add Variable" tugmasini bosing va birin-ketin qo'shing:
+
+━━━ Variable 1 ━━━
+Name: NODE_ENV
+Value: production
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 2 ━━━
+Name: JWT_SECRET
+Value: 8065f7e15a2c3f45066dfa6fd74dde6e3586c94996d078509d4bca75a13849e2
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 3 ━━━
+Name: JWT_REFRESH_SECRET
+Value: 07cf1169d3b0f8a4c87a2295c8e7c2c589d24f03b2c75011522c662de6f6b09f
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 4 ━━━
+Name: JWT_EXPIRES_IN
+Value: 15m
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 5 ━━━
+Name: JWT_REFRESH_EXPIRES_IN
+Value: 7d
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 6 ━━━
+Name: ADMIN_EMAIL
+Value: admin@yourcompany.uz
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 7 ━━━
+Name: ADMIN_PASSWORD
+Value: YourStrongPassword123!
+☑ Production  ☑ Preview  ☑ Development
+
+⚠️  MUHIM: Bu parolni o'zgartiring!
+
+━━━ Variable 8 ━━━
+Name: ALLOWED_ORIGINS
+Value: https://your-app.vercel.app
+☑ Production  ☑ Preview  ☑ Development
+
+⚠️  Deploy tugagach bu URL'ni haqiqiy URL'ga o'zgartiring!
+
+━━━ Variable 9 ━━━
+Name: RATE_LIMIT_WINDOW_MS
+Value: 900000
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 10 ━━━
+Name: RATE_LIMIT_MAX_REQUESTS
+Value: 100
+☑ Production  ☑ Preview  ☑ Development
+
+━━━ Variable 11 ━━━
+Name: LOG_LEVEL
+Value: info
+☑ Production  ☑ Preview  ☑ Development
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. DEPLOY!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Barcha sozlamalarni tekshiring va "Deploy" tugmasini bosing!
+
+⏳ 2-3 daqiqa kuting...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. URL OLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Deploy tugagach URL oling:
+https://fusion-erp-xxx.vercel.app
+
+Test qiling:
+https://your-app.vercel.app/api/ping
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. ALLOWED_ORIGINS NI YANGILANG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Deploy tugagach:
+Vercel Dashboard → Settings → Environment Variables → ALLOWED_ORIGINS
+
+Old: https://your-app.vercel.app
+New: https://fusion-erp-xxx.vercel.app (haqiqiy URL)
+
+Save va Redeploy qiling.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ TAYYOR!
+
+Login:
+Email: admin@yourcompany.uz
+Password: YourStrongPassword123!
+
+╔═══════════════════════════════════════════════════════════╗
+║               OMAD! MUVAFFAQIYATLI BO'LSIN! 🚀            ║
+╚═══════════════════════════════════════════════════════════╝

@@ -1,0 +1,37 @@
+# Render.com uchun konfiguratsiya.
+#
+# Doimiy disk ulanadi, chunki ma'lumot SQLite faylida saqlanadi — disksiz
+# har bir deploydan keyin baza yo'qolib ketardi.
+#
+# Deploy: https://dashboard.render.com → New → Blueprint → repozitoriyni tanlang.
+
+services:
+  - type: web
+    name: orbis-erp
+    runtime: node
+    plan: free
+    region: frankfurt
+
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+
+    # Bepul tarifda server harakatsizlikdan keyin uxlaydi; shu manzil uni
+    # tekshirish uchun ishlatiladi va sog'lomlik holatini bildiradi.
+    healthCheckPath: /api/ping
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # SQLite fayli doimiy diskda turadi (pastdagi mountPath bilan bir xil).
+      - key: DATABASE_PATH
+        value: /var/data/orbis.db
+
+      - key: NODE_ENV
+        value: production
+
+    # Deploylar orasida saqlanadigan disk.
+    disk:
+      name: orbis-data
+      mountPath: /var/data
+      sizeGB: 1

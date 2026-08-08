@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Vercel Deploy - Fusion ERP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #000;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 35px;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .step-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #000;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #333;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .btn-primary { background: #667eea; }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-success { background: #10b981; }
+        .btn-success:hover { background: #059669; }
+        .info-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info-box strong { color: #856404; }
+        .code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .env-vars {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .env-vars code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #e83e8c;
+        }
+        ul { margin-left: 20px; }
+        li { margin: 8px 0; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Vercel Deploy</h1>
+        <p class="subtitle">Fusion ERP - Production'ga deploy qilish</p>
+        
+        <div class="success">
+            ✅ GitHub'ga muvaffaqiyatli push qilindi!<br>
+            Repository: shodiyorfozilov18-glitch/fusion-erp
+        </div>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Vercel'ga kiring</div>
+                <p>GitHub account bilan login qiling:</p>
+                <a href="https://vercel.com/login" target="_blank" class="btn btn-primary">
+                    🔐 Vercel Login
+                </a>
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Repository Import qiling</div>
+                <p>Bu link orqali to'g'ridan-to'g'ri import qiling:</p>
+                <a href="https://vercel.com/new/git/external?repository-url=https://github.com/shodiyorfozilov18-glitch/fusion-erp" target="_blank" class="btn btn-success">
+                    📦 Import Repository
+                </a>
+                <div class="info-box">
+                    <strong>⚠️ Diqqat:</strong> Agar repository ko'rinmasa, Vercel'ga GitHub ruxsati bering:
+                    <a href="https://github.com/settings/installations" target="_blank">GitHub Settings → Applications</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Build Settings</div>
+                <p>Vercel'da quyidagi sozlamalarni kiriting:</p>
+                <ul>
+                    <li><strong>Framework Preset:</strong> Other</li>
+                    <li><strong>Build Command:</strong> <code class="code">pnpm run build:vercel</code></li>
+                    <li><strong>Output Directory:</strong> <code class="code">dist/spa</code></li>
+                    <li><strong>Install Command:</strong> <code class="code">pnpm install</code></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">4</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Environment Variables</div>
+                <p>Environment Variables bo'limida quyidagilarni qo'shing:</p>
+                <div class="env-vars">
+                    <code>NODE_ENV</code> = <strong>production</strong><br>
+                    <code>JWT_SECRET</code> = <strong>8065f7e15a2c3f45066dfa6fd74dde6e3586c94996d078509d4bca75a13849e2</strong><br>
+                    <code>JWT_REFRESH_SECRET</code> = <strong>07cf1169d3b0f8a4c87a2295c8e7c2c589d24f03b2c75011522c662de6f6b09f</strong><br>
+                    <code>JWT_EXPIRES_IN</code> = <strong>15m</strong><br>
+                    <code>JWT_REFRESH_EXPIRES_IN</code> = <strong>7d</strong><br>
+                    <code>ADMIN_EMAIL</code> = <strong>admin@yourcompany.uz</strong><br>
+                    <code>ADMIN_PASSWORD</code> = <strong>YourStrongPassword123!</strong><br>
+                    <code>ALLOWED_ORIGINS</code> = <strong>https://your-app.vercel.app</strong><br>
+                    <code>RATE_LIMIT_WINDOW_MS</code> = <strong>900000</strong><br>
+                    <code>RATE_LIMIT_MAX_REQUESTS</code> = <strong>100</strong><br>
+                    <code>LOG_LEVEL</code> = <strong>info</strong>
+                </div>
+                <div class="info-box">
+                    <strong>💡 Maslahat:</strong> Har bir variable uchun "Production", "Preview", "Development" checkboxlarini belgilang!
+                </div>
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">5</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Deploy!</div>
+                <p><strong>"Deploy"</strong> tugmasini bosing va 2-3 daqiqa kuting!</p>
+                <p style="margin-top: 15px;">Deploy tugagach, sizning ilovangiz shu yerda bo'ladi:</p>
+                <div class="code">https://fusion-erp.vercel.app</div>
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">6</span>
+            <div style="display: inline-block; vertical-align: top; width: calc(100% - 60px);">
+                <div class="step-title">Database Setup (Keyingi qadam)</div>
+                <p>Vercel Postgres yoki Supabase kerak:</p>
+                <ul>
+                    <li><a href="https://vercel.com/docs/storage/vercel-postgres" target="_blank">Vercel Postgres</a> - Vercel Dashboard → Storage</li>
+                    <li><a href="https://supabase.com" target="_blank">Supabase</a> - Free tier, oson setup</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="https://vercel.com/new" target="_blank" class="btn btn-success" style="font-size: 1.3em; padding: 20px 40px;">
+                🚀 Hoziroq Deploy Qiling!
+            </a>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px; color: #666;">
+            <p>❓ Savol bo'lsa: <a href="https://vercel.com/support" target="_blank">Vercel Support</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Automatically open Vercel new project page after 3 seconds
+        setTimeout(() => {
+            const shouldOpen = confirm("Vercel import sahifasini ochishni xohlaysizmi?");
+            if (shouldOpen) {
+                window.open('https://vercel.com/new/git/external?repository-url=https://github.com/shodiyorfozilov18-glitch/fusion-erp', '_blank');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

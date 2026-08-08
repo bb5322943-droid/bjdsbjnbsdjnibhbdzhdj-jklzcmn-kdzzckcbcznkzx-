@@ -1,0 +1,192 @@
+╔═══════════════════════════════════════════════════════════╗
+║           RENDER.COM DEPLOY - ODDIY QO'LLANMA           ║
+╚═══════════════════════════════════════════════════════════╝
+
+⚠️  VERCEL CLI ISHLAMAYAPTI (SSL muammosi)
+✅  RENDER - ALTERNATIV VA YAXSHIROQ!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 1: ACCOUNT YARATISH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Link: https://render.com/register
+
+1. Email kiriting
+2. Password yarating
+3. "Get Started" bosing
+4. Email'ni verify qiling (inbox tekshiring)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 2: NEW WEB SERVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dashboard: https://dashboard.render.com
+
+1. "New +" tugmasini bosing (yuqorida o'ngda)
+2. "Web Service" ni tanlang
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 3: DEPLOY METHOD TANLASH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3 ta variant:
+
+━━━ VARIANT A: Public Git Repository (ENG OSON) ⭐ ━━━
+
+1. "Public Git repository" ni tanlang
+2. GitHub repository URL kiriting:
+   https://github.com/shodiyorfozilov18-glitch/fusion-erp
+
+   (Yoki yangi repository yarating va push qiling)
+
+━━━ VARIANT B: Render Git (GitHub'siz) ━━━
+
+1. "Connect account" → "Connect Git Repository"
+2. Render sizga maxsus Git URL beradi:
+   https://git.render.com/srv-xxxxx.git
+
+3. Loyihangizda:
+   git init
+   git add .
+   git commit -m "Deploy to Render"
+   git remote add render <RENDER_GIT_URL>
+   git push render main
+
+━━━ VARIANT C: Docker Hub ━━━
+
+1. Docker image yarating va Docker Hub'ga push qiling
+2. Render'da Docker image'ni tanlang
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 4: SERVICE SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Name: fusion-erp
+
+Environment: Docker
+
+Region: Oregon (US West) yoki Frankfurt (Europe)
+
+Branch: main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 5: BUILD SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Docker ishlatsangiz, bu qismni bo'sh qoldiring!
+
+Build Command: (bo'sh)
+
+Start Command: (bo'sh)
+
+Dockerfile Render avtomatik topadi.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 6: PLAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Free plan tanlang:
+  • 750 soat/oy
+  • 512 MB RAM
+  • ✅ Test uchun yetarli
+
+Yoki Starter: $7/oy
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 7: ENVIRONMENT VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Advanced" ni bosing va 11 ta variable qo'shing:
+
+NODE_ENV = production
+JWT_SECRET = 8065f7e15a2c3f45066dfa6fd74dde6e3586c94996d078509d4bca75a13849e2
+JWT_REFRESH_SECRET = 07cf1169d3b0f8a4c87a2295c8e7c2c589d24f03b2c75011522c662de6f6b09f
+JWT_EXPIRES_IN = 15m
+JWT_REFRESH_EXPIRES_IN = 7d
+ADMIN_EMAIL = admin@yourcompany.uz
+ADMIN_PASSWORD = YourStrongPassword123!
+ALLOWED_ORIGINS = https://fusion-erp.onrender.com
+RATE_LIMIT_WINDOW_MS = 900000
+RATE_LIMIT_MAX_REQUESTS = 100
+LOG_LEVEL = info
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 8: CREATE WEB SERVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Create Web Service" tugmasini bosing!
+
+⏳ Build jarayoni: 5-10 daqiqa
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  QADAM 9: DATABASE (Ixtiyoriy)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Render Dashboard → "New +" → "PostgreSQL"
+
+1. Name: fusion-erp-db
+2. Database: fusion_db
+3. User: postgres
+4. Region: Same as web service
+5. Plan: Free (90 kun)
+
+Internal Database URL'ni copy qiling:
+postgresql://postgres:xxx@xxx.oregon-postgres.render.com/fusion_db
+
+Web Service'ga Environment Variable qo'shing:
+DATABASE_URL = <copied_url>
+
+Redeploy qiling!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ DEPLOY TUGADI!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Sizning URL:
+https://fusion-erp.onrender.com
+
+Test qiling:
+https://fusion-erp.onrender.com/api/ping
+
+Login:
+Email: admin@yourcompany.uz
+Password: YourStrongPassword123!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🚨 XATOLIKLAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build Failed:
+  → Logs'ni o'qing
+  → Dockerfile to'g'riligini tekshiring
+
+Runtime Error:
+  → Environment variables to'g'riligini tekshiring
+  → Logs → Events
+
+Port Error:
+  → Render PORT=10000 ishlatadi
+  → Dockerfile: EXPOSE 8080 → 10000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📞 YORDAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Muammo bo'lsa:
+  • Screenshot yuboring
+  • Logs'ni ko'rsating
+  • Men yordam beraman!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⭐ RENDER - VERCEL'DAN HAM YAXSHI! ⭐
+
+  • GitHub'siz ishlaydi
+  • PostgreSQL free
+  • Docker native
+  • SSL avtomatik
+  • Oson va ishonchli
+
+╔═══════════════════════════════════════════════════════════╗
+║                  OMAD! 🚀                                ║
+╚═══════════════════════════════════════════════════════════╝

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy Status Checker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 700px;
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        p {
+            color: #4a5568;
+            font-size: 1.2em;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+        .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.3em;
+            margin: 20px 10px;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .button-github {
+            background: #24292e;
+        }
+        .button-github:hover {
+            background: #1a1e22;
+        }
+        .status-box {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            border: 2px solid #e2e8f0;
+        }
+        .checklist {
+            text-align: left;
+            margin: 20px 0;
+        }
+        .checklist-item {
+            padding: 10px 0;
+            font-size: 1.1em;
+        }
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Deploy Status</h1>
+        <p>Loyihangiz deploy bo'ldimi tekshiring:</p>
+
+        <div style="margin: 40px 0;">
+            <a href="https://vercel.com/dashboard" target="_blank" class="button">
+                📊 Vercel Dashboard
+            </a>
+            <a href="https://github.com/shodiyorfozilov18-glitch/fusion-erp" target="_blank" class="button button-github">
+                💻 GitHub Repo
+            </a>
+        </div>
+
+        <div class="status-box">
+            <h2 style="color: #2d3748; margin-bottom: 20px;">✅ Tekshirish:</h2>
+            
+            <div class="checklist">
+                <div class="checklist-item">
+                    <span class="emoji">1️⃣</span>
+                    <strong>Vercel Dashboard'da</strong> proyekt bor?
+                </div>
+                <div class="checklist-item">
+                    <span class="emoji">2️⃣</span>
+                    Status <strong>"Ready"</strong> yoki <strong>"Building"</strong>?
+                </div>
+                <div class="checklist-item">
+                    <span class="emoji">3️⃣</span>
+                    URL ko'rsatilyaptimi?
+                </div>
+            </div>
+        </div>
+
+        <div class="status-box" style="background: #f0fff4; border-color: #48bb78;">
+            <h3 style="color: #2d3748;">✅ Agar "Ready" bo'lsa:</h3>
+            <p style="margin-top: 15px;">
+                Deploy bo'ldi! 🎉<br>
+                URL'ni oching va test qiling!
+            </p>
+        </div>
+
+        <div class="status-box" style="background: #fffaf0; border-color: #ed8936;">
+            <h3 style="color: #2d3748;">⏳ Agar "Building" bo'lsa:</h3>
+            <p style="margin-top: 15px;">
+                Deploy jarayonida.<br>
+                2-3 daqiqa kuting va yangilang.
+            </p>
+        </div>
+
+        <div class="status-box" style="background: #fff5f5; border-color: #fc8181;">
+            <h3 style="color: #2d3748;">❌ Agar "Failed" yoki yo'q bo'lsa:</h3>
+            <p style="margin-top: 15px;">
+                <strong>Hali import qilmadingiz</strong> yoki <strong>build xatosi</strong> bo'ldi.<br><br>
+                <a href="VERCEL_IMPORT.html" style="color: #667eea; text-decoration: underline;">
+                    Import ko'rsatmasini oching
+                </a>
+            </p>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #edf2f7; border-radius: 10px;">
+            <h3 style="color: #2d3748; margin-bottom: 15px;">🆘 Yordam kerak?</h3>
+            <p style="font-size: 1em;">
+                Vercel Dashboard'dan screenshot olib yuboring:<br>
+                1. Proyektlar ro'yxati<br>
+                2. Build logs (agar xato bo'lsa)
+            </p>
+        </div>
+    </div>
+</body>
+</html>

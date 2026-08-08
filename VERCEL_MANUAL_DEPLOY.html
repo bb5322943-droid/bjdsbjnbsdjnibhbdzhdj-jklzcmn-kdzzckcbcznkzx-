@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fusion ERP - Vercel Manual Deploy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .status {
+            background: #f7fafc;
+            border-left: 4px solid #4299e1;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .status h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        .status code {
+            background: #edf2f7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #2d3748;
+        }
+        .steps {
+            margin: 30px 0;
+        }
+        .step {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+        .step:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .step h3 {
+            display: inline-block;
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+        .step p {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-left: 55px;
+        }
+        .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .button-github {
+            background: #24292e;
+        }
+        .button-github:hover {
+            background: #1a1e22;
+        }
+        .warning {
+            background: #fff5f5;
+            border-left: 4px solid #fc8181;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .success {
+            background: #f0fff4;
+            border-left: 4px solid #48bb78;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Fusion ERP Deploy</h1>
+        <p class="subtitle">Vercel Manual Deploy - Eng Oson Yo'l</p>
+
+        <div class="status">
+            <h3>📊 Hozirgi Holat:</h3>
+            <p>
+                ✅ Git repository yaratildi<br>
+                ✅ Barcha fayllar commit qilindi<br>
+                ✅ Build tayyor (<code>dist/</code>)<br>
+                ✅ Vercel proyekt mavjud: <code>orbis</code><br>
+                ❌ SSL muammosi tufayli CLI ishlamayapti
+            </p>
+        </div>
+
+        <div class="warning">
+            <h3>⚠️ Muammo</h3>
+            <p>Sizda korporativ tarmoq/firewall SSL sertifikat muammosi bor. Shuning uchun Vercel CLI va npm install ishlamayapti.</p>
+        </div>
+
+        <div class="success">
+            <h3>✅ Yechim</h3>
+            <p>GitHub orqali deploy qilsangiz, Vercel o'z serverlarida build qiladi va SSL muammo bo'lmaydi!</p>
+        </div>
+
+        <div class="steps">
+            <h2 style="color: #2d3748; margin-bottom: 20px;">📋 Deploy Qilish (3 ta usul):</h2>
+
+            <!-- Variant 1 -->
+            <div class="step">
+                <span class="step-number">1</span>
+                <h3>Hozirgi build'ni redeploy (ENG TEZKOR)</h3>
+                <p>
+                    Allaqachon tayyor build'ni deploy qiling:<br><br>
+                    1. <a href="https://vercel.com" target="_blank" class="button">Vercel.com ga kiring →</a><br>
+                    2. "orbis" proyektini oching<br>
+                    3. "Deployments" tab<br>
+                    4. "..." → "Redeploy" bosing<br><br>
+                    ⏱️ Vaqt: 2 daqiqa
+                </p>
+            </div>
+
+            <!-- Variant 2 -->
+            <div class="step">
+                <span class="step-number">2</span>
+                <h3>GitHub orqali (TAVSIYA QILINADI)</h3>
+                <p>
+                    <strong>A. GitHub'da repo yarating:</strong><br>
+                    <a href="https://github.com/new" target="_blank" class="button button-github">GitHub'da Repo Yaratish →</a><br><br>
+                    
+                    <strong>B. Terminal'da push qiling:</strong>
+                </p>
+                <div class="code-block">
+git remote add origin https://github.com/YOUR_USERNAME/fusion-erp.git<br>
+git push -u origin main
+                </div>
+                <p>
+                    <strong>C. Vercel'da ulang:</strong><br>
+                    Vercel → orbis → Settings → Git → Connect Repository<br><br>
+                    ⏱️ Vaqt: 10 daqiqa<br>
+                    🎁 Bonus: Har safar git push = avtomatik deploy!
+                </p>
+            </div>
+
+            <!-- Variant 3 -->
+            <div class="step">
+                <span class="step-number">3</span>
+                <h3>GitHub Desktop (GUI)</h3>
+                <p>
+                    Agar terminal bilan ishla qilish qiyin bo'lsa:<br><br>
+                    1. <a href="https://desktop.github.com" target="_blank" class="button button-github">GitHub Desktop yuklab oling →</a><br>
+                    2. O'rnating va login qiling<br>
+                    3. "Add Local Repository" → loyiha papkasini tanlang<br>
+                    4. "Publish repository" bosing<br>
+                    5. Vercel'da GitHub'ga ulang<br><br>
+                    ⏱️ Vaqt: 15 daqiqa (birinchi marta)
+                </p>
+            </div>
+        </div>
+
+        <div class="status">
+            <h3>🎯 Deploy bo'lgandan keyin:</h3>
+            <p>
+                URL: <code>https://orbis.vercel.app</code><br>
+                API test: <code>https://orbis.vercel.app/api/ping</code>
+            </p>
+        </div>
+
+        <div class="warning">
+            <h3>⚙️ Environment Variables (MAJBURIY!)</h3>
+            <p>
+                Vercel Dashboard → Settings → Environment Variables'da qo'shing:<br><br>
+                • JWT_SECRET (random 64 char)<br>
+                • JWT_REFRESH_SECRET (random 64 char)<br>
+                • ADMIN_EMAIL<br>
+                • ADMIN_PASSWORD<br>
+                • DATABASE_URL (Vercel PostgreSQL)<br>
+                • NODE_ENV=production<br>
+                • ALLOWED_ORIGINS=https://orbis.vercel.app
+            </p>
+        </div>
+
+        <p style="text-align: center; margin-top: 40px; color: #718096;">
+            📖 Batafsil ko'rsatma: <code>OXIRGI_YECHIM.md</code><br>
+            💬 Yordam kerak bo'lsa, so'rang!
+        </p>
+    </div>
+</body>
+</html>

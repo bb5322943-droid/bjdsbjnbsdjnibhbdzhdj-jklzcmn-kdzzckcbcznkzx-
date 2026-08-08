@@ -1,0 +1,169 @@
+═══════════════════════════════════════════════════════════════
+  VERCEL ENVIRONMENT VARIABLES - COPY-PASTE TAYYOR
+═══════════════════════════════════════════════════════════════
+
+📋 QANDAY ISHLASH:
+1. Vercel Dashboard → Project Settings → Environment Variables
+2. Har bir qatorni alohida "Add" qiling
+3. Name va Value kiritib, checkboxlarni belgilang:
+   ✅ Production
+   ✅ Preview  
+   ✅ Development
+
+═══════════════════════════════════════════════════════════════
+
+🔐 AUTHENTICATION & SECURITY
+───────────────────────────────────────────────────────────────
+
+Name: NODE_ENV
+Value: production
+
+Name: JWT_SECRET
+Value: 8065f7e15a2c3f45066dfa6fd74dde6e3586c94996d078509d4bca75a13849e2
+
+Name: JWT_REFRESH_SECRET
+Value: 07cf1169d3b0f8a4c87a2295c8e7c2c589d24f03b2c75011522c662de6f6b09f
+
+Name: JWT_EXPIRES_IN
+Value: 15m
+
+Name: JWT_REFRESH_EXPIRES_IN
+Value: 7d
+
+═══════════════════════════════════════════════════════════════
+
+👤 ADMIN ACCOUNT
+───────────────────────────────────────────────────────────────
+
+Name: ADMIN_EMAIL
+Value: admin@yourcompany.uz
+
+Name: ADMIN_PASSWORD
+Value: YourStrongPassword123!
+
+⚠️  DIQQAT: Admin parolni ALBATTA o'zgartiring!
+Kamida 12 belgi, katta/kichik harf, raqam, maxsus belgi
+
+═══════════════════════════════════════════════════════════════
+
+🌐 CORS & SECURITY
+───────────────────────────────────────────────────────────────
+
+Name: ALLOWED_ORIGINS
+Value: https://your-app.vercel.app
+
+⚠️  "your-app" ni o'z domain'ingizga o'zgartiring!
+Deploy tugagach, haqiqiy URL'ni kiriting.
+
+═══════════════════════════════════════════════════════════════
+
+🚦 RATE LIMITING
+───────────────────────────────────────────────────────────────
+
+Name: RATE_LIMIT_WINDOW_MS
+Value: 900000
+
+Name: RATE_LIMIT_MAX_REQUESTS
+Value: 100
+
+═══════════════════════════════════════════════════════════════
+
+📝 LOGGING
+───────────────────────────────────────────────────────────────
+
+Name: LOG_LEVEL
+Value: info
+
+Name: LOG_FILE_PATH
+Value: /tmp/fusion-erp.log
+
+═══════════════════════════════════════════════════════════════
+
+💾 DATABASE (KEYINGI QADAM)
+───────────────────────────────────────────────────────────────
+
+⚠️  Hozircha database yo'q - keyingi qadamda qo'shamiz
+
+VARIANT 1: Vercel Postgres
+───────────────────────────
+1. Vercel Dashboard → Storage → Create Database → Postgres
+2. "Postgres" ni tanlang
+3. Avtomatik environment variable qo'shiladi:
+   - DATABASE_URL (avtomatik)
+
+VARIANT 2: Supabase (FREE)
+───────────────────────────
+1. supabase.com → New Project
+2. Settings → Database → Connection string
+3. Qo'lda qo'shing:
+
+Name: DATABASE_URL
+Value: postgresql://postgres:[YOUR-PASSWORD]@db.xxx.supabase.co:5432/postgres
+
+VARIANT 3: Neon (Serverless PostgreSQL)
+────────────────────────────────────────
+1. neon.tech → New Project
+2. Connection string'ni copy qiling
+3. Qo'lda qo'shing:
+
+Name: DATABASE_URL
+Value: postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/dbname
+
+═══════════════════════════════════════════════════════════════
+
+📊 IXTIYORIY (AGAR KERAK BO'LSA)
+───────────────────────────────────────────────────────────────
+
+Name: BACKUP_ENABLED
+Value: true
+
+Name: BACKUP_SCHEDULE
+Value: 0 2 * * *
+
+Name: BACKUP_RETENTION_DAYS
+Value: 30
+
+Name: SMTP_HOST
+Value: smtp.gmail.com
+
+Name: SMTP_PORT
+Value: 587
+
+Name: SMTP_USER
+Value: your-email@gmail.com
+
+Name: SMTP_PASS
+Value: your-app-specific-password
+
+═══════════════════════════════════════════════════════════════
+
+✅ TEKSHIRISH LISTI
+───────────────────────────────────────────────────────────────
+
+Deploy qilishdan oldin:
+□ JWT_SECRET - yangi, 64 belgi
+□ JWT_REFRESH_SECRET - yangi, 64 belgi
+□ ADMIN_PASSWORD - kuchli parol
+□ ALLOWED_ORIGINS - to'g'ri domain
+□ Barcha checkbox'lar belgilangan (Production/Preview/Development)
+
+═══════════════════════════════════════════════════════════════
+
+🎯 KEYINGI QADAMLAR:
+
+1. ✅ Vercel'da import qiling (VERCEL_IMPORT.html ochilgan)
+2. ✅ Build settings kiriting
+3. ✅ Environment variables qo'shing (yuqoridagilarni)
+4. 🚀 Deploy tugmasini bosing
+5. ⏳ 2-3 daqiqa kuting
+6. ✅ URL oling va test qiling
+7. 💾 Database sozlang (Vercel Postgres yoki Supabase)
+
+═══════════════════════════════════════════════════════════════
+
+📞 YORDAM:
+- Vercel Docs: https://vercel.com/docs
+- Support: https://vercel.com/support
+- Community: https://github.com/vercel/vercel/discussions
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,135 @@
+╔═══════════════════════════════════════════════════════════╗
+║     VERCEL MANUAL DEPLOY - GITHUB'SIZ (ZIP Upload)      ║
+╚═══════════════════════════════════════════════════════════╝
+
+✅ GitHub remote o'chirildi!
+📦 ZIP fayl tayyor: fusion-erp-vercel.zip
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  HOZIR QILING (5 daqiqa):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+QADAM 1: Vercel Dashboard'ga kiring
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Link: https://vercel.com/dashboard
+
+1. "Continue with Email" yoki "Continue with GitHub" (login uchun)
+2. Login qiling
+
+QADAM 2: Yangi Project yaratish
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. "Add New..." tugmasini bosing
+2. "Project" ni tanlang
+3. "Browse" yoki "Deploy" bo'limini oching
+
+QADAM 3: ZIP faylni upload qiling
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  MUHIM: Ba'zi Vercel versiyalarida ZIP upload yo'q!
+
+Agar "Upload" tugmasi ko'rinmasa:
+  → Vercel CLI kerak (SSL muammosi tufayli ishlamayapti)
+  → Yoki GitHub kerak
+
+Agar "Upload" yoki "Browse" tugmasi bor bo'lsa:
+  1. "fusion-erp-vercel.zip" ni tanlang
+  2. Upload boshlandi (biroz vaqt ketadi)
+
+QADAM 4: Project Settings
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project Name: fusion-erp
+Framework Preset: Other
+Root Directory: ./
+
+QADAM 5: Build Settings
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build Command:
+pnpm run build:vercel
+
+Output Directory:
+dist/spa
+
+Install Command:
+pnpm install
+
+Node.js Version: 18.x
+
+QADAM 6: Environment Variables
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Add Variable" tugmasini bosing va 11 ta variable qo'shing:
+
+1. NODE_ENV = production
+2. JWT_SECRET = 8065f7e15a2c3f45066dfa6fd74dde6e3586c94996d078509d4bca75a13849e2
+3. JWT_REFRESH_SECRET = 07cf1169d3b0f8a4c87a2295c8e7c2c589d24f03b2c75011522c662de6f6b09f
+4. JWT_EXPIRES_IN = 15m
+5. JWT_REFRESH_EXPIRES_IN = 7d
+6. ADMIN_EMAIL = admin@yourcompany.uz
+7. ADMIN_PASSWORD = YourStrongPassword123!
+8. ALLOWED_ORIGINS = https://your-app.vercel.app
+9. RATE_LIMIT_WINDOW_MS = 900000
+10. RATE_LIMIT_MAX_REQUESTS = 100
+11. LOG_LEVEL = info
+
+⚠️ Har biri uchun checkboxlar:
+☑ Production  ☑ Preview  ☑ Development
+
+QADAM 7: Deploy!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Deploy" tugmasini bosing
+⏳ 2-3 daqiqa kuting
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ⚠️  MUHIM ESLATMALAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ZIP UPLOAD BA'ZI VERCEL VERSIYALARIDA YO'Q
+   → Agar ko'rinmasa, Vercel CLI yoki GitHub kerak
+
+2. HAR SAFAR O'ZGARTIRISH QILSANGIZ
+   → Yangi ZIP yarating
+   → Qaytadan upload qiling
+   → Bu juda noqulay!
+
+3. VERCEL CLI ISHLAMAYAPTI
+   → SSL sertifikat muammosi
+   → Korporativ proksi/firewall
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🎯 ALTERNATIV: GITHUB QAYTADAN ULASH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Agar ZIP upload ishlamasa:
+
+1. GitHub repository qaytadan ulang:
+   git remote add origin https://github.com/shodiyorfozilov18-glitch/fusion-erp.git
+
+2. Push qiling:
+   git push -u origin main
+
+3. Vercel'da GitHub'dan import qiling:
+   https://vercel.com/new
+
+Bu osonroq va professional!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  📞 YORDAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Agar muammo bo'lsa:
+  • Screenshot yuboring
+  • Qanday xato chiqayotganini ayting
+  • Alternative yechim topamiz!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⭐ TAVSIYA: GitHub bilan ishlang - bu professional usul!
+
+╔═══════════════════════════════════════════════════════════╗
+║                      OMAD! 🚀                            ║
+╚═══════════════════════════════════════════════════════════╝
