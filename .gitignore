@@ -85,3 +85,4 @@ credentials/
 
 !server/data/
 !server/data/store.ts
+.env*

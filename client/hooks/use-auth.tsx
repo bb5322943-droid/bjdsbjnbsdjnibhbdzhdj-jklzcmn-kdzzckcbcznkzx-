@@ -128,29 +128,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (login: string, password: string) => {
-      // Content-Type sifatida `text/plain` — Vercel serverless runtime
-      // `application/json` body'ni funksiyaga yetkazishdan oldin buzadi
-      // (400 Bad Request). `text/plain` da body xom holicha serverga yetadi,
-      // server (Express) o'zi JSON.parse qiladi. Bir xil sabab `use-api.ts` da.
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body: JSON.stringify({ login, password }),
-      });
+      try {
+        console.log("📝 Login attempt:", { login });
+        
+        // Content-Type sifatida `text/plain` — Vercel serverless runtime
+        // `application/json` body'ni funksiyaga yetkazishdan oldin buzadi
+        // (400 Bad Request). `text/plain` da body xom holicha serverga yetadi,
+        // server (Express) o'zi JSON.parse qiladi. Bir xil sabab `use-api.ts` da.
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=UTF-8" },
+          body: JSON.stringify({ login, password }),
+        });
 
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(body?.message ?? "Kirishda xatolik yuz berdi");
+        console.log("📡 Response status:", response.status);
+        
+        const body = await response.json().catch(() => null);
+        console.log("📦 Response body:", body);
+
+        if (!response.ok) {
+          const errorMessage = body?.message ?? "Kirishda xatolik yuz berdi";
+          console.error("❌ Login failed:", { status: response.status, message: errorMessage });
+          throw new Error(errorMessage);
+        }
+
+        const { token, user: loggedIn } = (body as ApiResponse<LoginResponse>).data;
+        
+        if (!token || !loggedIn) {
+          console.error("❌ Invalid response data:", { hasToken: !!token, hasUser: !!loggedIn });
+          throw new Error("Tizim xatosi: Noto'g'ri javob");
+        }
+
+        console.log("✅ Login successful:", { user: loggedIn.email });
+        
+        // React Query keshini tozalash - eski ma'lumotlar qolmasligi uchun
+        queryClient.clear();
+        
+        // Token va foydalanuvchini o'rnatish
+        setToken(token);
+        setUser(loggedIn);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Noma'lum xatolik";
+        console.error("❌ Login error:", { 
+          message: errorMessage,
+          error: err 
+        });
+        throw err;
       }
-
-      const { token, user: loggedIn } = (body as ApiResponse<LoginResponse>).data;
-      
-      // React Query keshini tozalash - eski ma'lumotlar qolmasligi uchun
-      queryClient.clear();
-      
-      // Token va foydalanuvchini o'rnatish
-      setToken(token);
-      setUser(loggedIn);
     },
     [queryClient],
   );

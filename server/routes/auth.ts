@@ -45,10 +45,12 @@ const changePasswordSchema = z.object({
 export const login: RequestHandler = (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
+    console.error("❌ Login validation error:", parsed.error);
     return sendValidationError(res, parsed.error);
   }
 
   const loginValue = parsed.data.login.trim().toLowerCase();
+  console.log("🔍 Login attempt:", { login: loginValue });
   
   // Email yoki login orqali qidirish
   const user = users.find(
@@ -60,15 +62,29 @@ export const login: RequestHandler = (req, res) => {
       !item.deletedAt
   );
 
-  // Foydalanuvchi topilmagani va parol noto'g'riligi bir xil xabar beradi —
-  // aks holda qaysi login ro'yxatda borligini aniqlab olish mumkin bo'lardi.
-  if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+  if (!user) {
+    console.error("❌ User not found:", loginValue);
+    console.error("📋 Available users:", users.map(u => ({ login: u.login, email: u.email, hasPassword: !!u.passwordHash })));
+  }
+
+  // Parol tekshirish
+  const passwordValid = user ? verifyPassword(parsed.data.password, user.passwordHash) : false;
+  
+  if (!user || !passwordValid) {
+    console.error("❌ Auth failed:", { 
+      userFound: !!user, 
+      passwordValid,
+      userEmail: user?.email,
+      userLogin: user?.login,
+      hasPasswordHash: !!user?.passwordHash
+    });
     return res
       .status(401)
       .json({ success: false, message: "Login yoki parol noto'g'ri" });
   }
 
   if (user.status === "suspended") {
+    console.warn("⚠️ User suspended:", user.email);
     return res.status(403).json({
       success: false,
       message: "Hisobingiz to'xtatilgan. Administratorga murojaat qiling.",
@@ -77,6 +93,8 @@ export const login: RequestHandler = (req, res) => {
 
   user.lastLogin = new Date().toISOString();
   const token = createSession(user.id);
+
+  console.log("✅ Login successful:", { user: user.email, token: token.substring(0, 10) + "..." });
 
   recordAudit({
     user,
