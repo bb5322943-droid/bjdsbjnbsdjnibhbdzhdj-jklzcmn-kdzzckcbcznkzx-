@@ -91,10 +91,17 @@ if (usersMissingPassword.length > 0) {
 
 /**
  * Production deploymentda admin foydalanuvchini yaratish yoki yangilash.
- * Environment variable'lardan ADMIN_EMAIL va ADMIN_PASSWORD olinadi.
+ * Environment variable'lardan yoki hardcoded qiymatlardan olinadi.
+ * 
+ * DEPLOY UCHUN DEFAULT LOGIN (hardcoded - ishonchli):
+ * Email: admin@orbiserp.uz
+ * Parol: OrbisAdmin2024!
  */
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@yourcompany.com";
-const ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD;
+const PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
+const PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
+const ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
 
 if (ADMIN_PASSWORD_FROM_ENV) {
   // Admin foydalanuvchini topish (email yoki login bo'yicha)
@@ -120,6 +127,9 @@ if (ADMIN_PASSWORD_FROM_ENV) {
     users.push(adminUser);
     writeTable("users", users);
     console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
+    console.info("🔑 Admin login ma'lumotlari:");
+    console.info(`   Email: ${ADMIN_EMAIL}`);
+    console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
   } else {
     // Admin mavjud - parolni yangilash
     adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
@@ -128,6 +138,9 @@ if (ADMIN_PASSWORD_FROM_ENV) {
     adminUser.status = "active";
     writeTable("users", users);
     console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
+    console.info("🔑 Admin login ma'lumotlari:");
+    console.info(`   Email: ${ADMIN_EMAIL}`);
+    console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
   }
 }
 

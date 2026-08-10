@@ -1007,15 +1007,33 @@ function roleFor(employee: Employee, index: number): UserRole {
 
 /**
  * Oddiy 4 ta foydalanuvchi: admin, menejr, hisobchi, kassir
- * Hammasi uchun parol: 123456
- * Login: rol nomi bilan bir xil
+ * 
+ * DEPLOY UCHUN DEFAULT LOGIN/PAROL:
+ * Login: admin@orbiserp.uz
+ * Parol: OrbisAdmin2024!
+ * 
+ * Bu parol production'da ham ishlaydi (environment variable bo'lmasa)
  */
 export const DEMO_PASSWORD = "123456";
 
+// Production uchun default admin credentials (hardcoded - deploy'da ishlaydi)
+const PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
+const PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
+
 function buildUsers(employees: Employee[]): StoredUser[] {
   const now = new Date();
-  const passwordHash = hashPassword("123456"); // Hamma uchun bir xil parol
   const createdDate = isoDate(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // Production yoki development muhitini aniqlash
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  // Admin uchun parol - environment variable yoki default
+  const adminEmail = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
+  const adminPasswordHash = hashPassword(adminPassword);
+  
+  // Boshqa foydalanuvchilar uchun oddiy parol
+  const demoPasswordHash = hashPassword("123456");
 
   // Faqat 4 ta oddiy foydalanuvchi
   const users: StoredUser[] = [
@@ -1023,13 +1041,13 @@ function buildUsers(employees: Employee[]): StoredUser[] {
       id: "1",
       name: "Administrator",
       login: "admin",
-      email: "admin@test.uz",
+      email: adminEmail,
       role: "admin",
       status: "active",
       lastLogin: now.toISOString(),
       employeeId: null,
       createdDate,
-      passwordHash,
+      passwordHash: adminPasswordHash, // Production parol
     },
     {
       id: "2", 
@@ -1041,7 +1059,7 @@ function buildUsers(employees: Employee[]): StoredUser[] {
       lastLogin: now.toISOString(),
       employeeId: null,
       createdDate,
-      passwordHash,
+      passwordHash: demoPasswordHash,
     },
     {
       id: "3",
@@ -1053,7 +1071,7 @@ function buildUsers(employees: Employee[]): StoredUser[] {
       lastLogin: now.toISOString(),
       employeeId: null,
       createdDate,
-      passwordHash,
+      passwordHash: demoPasswordHash,
     },
     {
       id: "4",
@@ -1065,7 +1083,7 @@ function buildUsers(employees: Employee[]): StoredUser[] {
       lastLogin: now.toISOString(),
       employeeId: null,
       createdDate,
-      passwordHash,
+      passwordHash: demoPasswordHash,
     },
   ];
 
