@@ -20,8 +20,11 @@ const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 /**
  * DIQQAT: Yangi hisob uchun boshlang'ich parol environment variable'dan olinadi.
  * Production'da albatta .env faylida o'rnatilishi kerak!
+ * 
+ * DEFAULT (Deploy): OrbisAdmin2024!
+ * TEST (Demo): 123456
  */
-export const DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || "";
+export const DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || "OrbisAdmin2024!";
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
