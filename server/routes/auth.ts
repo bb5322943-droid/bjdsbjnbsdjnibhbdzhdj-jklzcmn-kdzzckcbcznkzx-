@@ -48,10 +48,16 @@ export const login: RequestHandler = (req, res) => {
     return sendValidationError(res, parsed.error);
   }
 
+  const loginValue = parsed.data.login.trim().toLowerCase();
+  
+  // Email yoki login orqali qidirish
   const user = users.find(
     (item) =>
-      item.login && item.login.toLowerCase() === parsed.data.login.trim().toLowerCase() &&
-        !item.deletedAt
+      (
+        (item.login && item.login.toLowerCase() === loginValue) ||
+        (item.email && item.email.toLowerCase() === loginValue)
+      ) &&
+      !item.deletedAt
   );
 
   // Foydalanuvchi topilmagani va parol noto'g'riligi bir xil xabar beradi —
