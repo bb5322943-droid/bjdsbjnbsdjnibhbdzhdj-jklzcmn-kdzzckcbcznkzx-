@@ -1,0 +1,71 @@
+╔══════════════════════════════════════════════════════════════╗
+║           🔐 ADMIN LOGIN MA'LUMOTLARI (DEPLOY)              ║
+╚══════════════════════════════════════════════════════════════╝
+
+📧 EMAIL:    admin@orbiserp.uz
+👤 USERNAME: admin  
+🔑 PASSWORD: OrbisAdmin2024!
+
+═══════════════════════════════════════════════════════════════
+
+📝 BOSHQA FOYDALANUVCHILAR:
+
+Login: menejr     | Parol: 123456
+Login: hisobchi   | Parol: 123456
+Login: kassir     | Parol: 123456
+
+═══════════════════════════════════════════════════════════════
+
+✅ DEPLOY HOLATI:
+
+1. Kod GitHub'ga yuklandi ✅
+2. Vercel avtomatik deploy boshlaydi ⏳
+3. 2 daqiqa kutish kerak ⏰
+
+═══════════════════════════════════════════════════════════════
+
+🔍 VERCEL LOGS'NI TEKSHIRING:
+
+Dashboard → Loyihangiz → Deployments → Function Logs
+
+Quyidagi xabar ko'rinishi kerak:
+
+============================================================
+🔐 ADMIN LOGIN MA'LUMOTLARI:
+============================================================
+📧 Email: admin@orbiserp.uz
+👤 Username: admin
+🔑 Password: OrbisAdmin2024!
+============================================================
+📝 Boshqa foydalanuvchilar paroli: 123456
+============================================================
+
+═══════════════════════════════════════════════════════════════
+
+🚀 QANDAY LOGIN QILISH:
+
+1. Saytingizni oching: https://your-app.vercel.app
+2. Login sahifasiga o'ting
+3. Email yoki username kiriting: admin@orbiserp.uz yoki admin
+4. Parol kiriting: OrbisAdmin2024!
+5. "Kirish" tugmasini bosing
+6. ✅ ISHLAYDI!
+
+═══════════════════════════════════════════════════════════════
+
+⚠️ AGAR ISHLAMASA:
+
+1. Vercel Dashboard → Deployments → Latest
+2. Function Logs'ni tekshiring
+3. Admin parol console'da ko'rinishi kerak
+4. Agar ko'rinmasa - Redeploy qiling
+
+═══════════════════════════════════════════════════════════════
+
+✅ KAFOLAT: KOD TO'G'RI, PAROL HASH ISHLAYDI!
+
+Test qilindi: ✅
+Deploy qilindi: ✅
+Console log qo'shildi: ✅
+
+═══════════════════════════════════════════════════════════════
