@@ -30,6 +30,7 @@
     "check:env": "node -e \"const fs=require('fs');const env=fs.readFileSync('.env','utf8');if(env.includes('default-secret')||env.includes('Orbis2026')){console.error('❌ .env faylida standart parollar/secretlar topildi!');process.exit(1)}else{console.log('✅ .env fayli xavfsiz')}\""
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",

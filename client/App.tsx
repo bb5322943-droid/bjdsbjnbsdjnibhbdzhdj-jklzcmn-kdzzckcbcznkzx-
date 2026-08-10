@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { hasPermission } from "@/lib/permissions";
 import { PermissionModule, UserRole } from "@shared/api";
@@ -173,6 +174,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <SpeedInsights />
       {/*
         v7 xatti-harakatiga oldindan o'tamiz: holat yangilanishlari
         `startTransition` ichida bo'ladi va splat route'lardagi nisbiy
