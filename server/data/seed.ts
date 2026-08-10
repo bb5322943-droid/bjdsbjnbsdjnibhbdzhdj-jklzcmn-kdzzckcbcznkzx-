@@ -1087,6 +1087,17 @@ function buildUsers(employees: Employee[]): StoredUser[] {
     },
   ];
 
+  // CONSOLE LOG - Deploy qilganda parollarni ko'rish uchun
+  console.log("\n" + "=".repeat(60));
+  console.log("🔐 ADMIN LOGIN MA'LUMOTLARI:");
+  console.log("=".repeat(60));
+  console.log(`📧 Email: ${adminEmail}`);
+  console.log(`👤 Username: admin`);
+  console.log(`🔑 Password: ${adminPassword}`);
+  console.log("=".repeat(60));
+  console.log(`📝 Boshqa foydalanuvchilar paroli: ${DEMO_PASSWORD}`);
+  console.log("=".repeat(60) + "\n");
+
   return users;
 }
 
