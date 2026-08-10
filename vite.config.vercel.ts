@@ -19,14 +19,14 @@ export default defineConfig({
       entry: path.resolve(__dirname, "server/vercel-handler.ts"),
       formats: ["es"],
     },
-    outDir: "api/_bundle",
+    outDir: "api",
     target: "node22",
     ssr: true,
     rollupOptions: {
       // Faqat Node built-in'lar tashqarida — qolgani bundle'ga kiradi.
       external: [/^node:/],
       output: {
-        entryFileNames: "index.func.mjs",
+        entryFileNames: "index.mjs",
       },
     },
     minify: false,

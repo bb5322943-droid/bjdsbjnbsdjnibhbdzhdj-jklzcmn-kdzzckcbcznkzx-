@@ -30,6 +30,7 @@
     "check:env": "node -e \"const fs=require('fs');const env=fs.readFileSync('.env','utf8');if(env.includes('default-secret')||env.includes('Orbis2026')){console.error('❌ .env faylida standart parollar/secretlar topildi!');process.exit(1)}else{console.log('✅ .env fayli xavfsiz')}\""
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
@@ -75,6 +76,7 @@
     "@swc/core": "^1.13.3",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/react-query": "^5.84.2",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.7",

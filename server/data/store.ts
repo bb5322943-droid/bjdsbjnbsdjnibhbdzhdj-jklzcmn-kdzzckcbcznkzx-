@@ -90,6 +90,48 @@ if (usersMissingPassword.length > 0) {
 }
 
 /**
+ * Production deploymentda admin foydalanuvchini yaratish yoki yangilash.
+ * Environment variable'lardan ADMIN_EMAIL va ADMIN_PASSWORD olinadi.
+ */
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@yourcompany.com";
+const ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD;
+
+if (ADMIN_PASSWORD_FROM_ENV) {
+  // Admin foydalanuvchini topish (email yoki login bo'yicha)
+  let adminUser = users.find(
+    (u) => u.email === ADMIN_EMAIL || u.login === "admin" || u.role === "admin"
+  );
+
+  if (!adminUser) {
+    // Admin yo'q bo'lsa - yangi admin yaratish
+    const now = new Date();
+    adminUser = {
+      id: nextId(),
+      name: "Administrator",
+      login: "admin",
+      email: ADMIN_EMAIL,
+      role: "admin",
+      status: "active",
+      lastLogin: now.toISOString(),
+      employeeId: null,
+      createdDate: now.toISOString().split("T")[0],
+      passwordHash: hashPassword(ADMIN_PASSWORD_FROM_ENV),
+    };
+    users.push(adminUser);
+    writeTable("users", users);
+    console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
+  } else {
+    // Admin mavjud - parolni yangilash
+    adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
+    adminUser.email = ADMIN_EMAIL;
+    adminUser.role = "admin";
+    adminUser.status = "active";
+    writeTable("users", users);
+    console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
+  }
+}
+
+/**
  * Xotiradagi holatni bazaga yozadi.
  * O'zgartiruvchi so'rovdan keyin chaqiriladi (`server/index.ts` dagi middleware).
  */
