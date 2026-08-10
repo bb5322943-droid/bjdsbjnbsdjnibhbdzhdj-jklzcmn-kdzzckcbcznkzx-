@@ -638,12 +638,21 @@ export function createServer() {
       url: req.originalUrl,
       body: req.body,
     });
+    
+    // Console'ga ham chiqarish (Vercel logs uchun)
+    console.error("❌ SERVER ERROR:", {
+      message: error.message,
+      stack: error.stack,
+      url: req.originalUrl,
+      method: req.method,
+    });
 
     // Production'da xato detallari foydalanuvchiga ko'rinmasin (xavfsizlik)
     if (process.env.NODE_ENV === "production") {
       return res.status(error.status || 500).json({
         success: false,
         message: "Ichki server xatosi. Iltimos, keyinroq urinib ko'ring.",
+        error: error.message, // Debug uchun
       });
     }
 

@@ -43,73 +43,81 @@ const changePasswordSchema = z.object({
 });
 
 export const login: RequestHandler = (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    console.error("❌ Login validation error:", parsed.error);
-    return sendValidationError(res, parsed.error);
-  }
+  try {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      console.error("❌ Login validation error:", parsed.error);
+      return sendValidationError(res, parsed.error);
+    }
 
-  const loginValue = parsed.data.login.trim().toLowerCase();
-  console.log("🔍 Login attempt:", { login: loginValue });
-  
-  // Email yoki login orqali qidirish
-  const user = users.find(
-    (item) =>
-      (
-        (item.login && item.login.toLowerCase() === loginValue) ||
-        (item.email && item.email.toLowerCase() === loginValue)
-      ) &&
-      !item.deletedAt
-  );
+    const loginValue = parsed.data.login.trim().toLowerCase();
+    console.log("🔍 Login attempt:", { login: loginValue });
+    
+    // Email yoki login orqali qidirish
+    const user = users.find(
+      (item) =>
+        (
+          (item.login && item.login.toLowerCase() === loginValue) ||
+          (item.email && item.email.toLowerCase() === loginValue)
+        ) &&
+        !item.deletedAt
+    );
 
-  if (!user) {
-    console.error("❌ User not found:", loginValue);
-    console.error("📋 Available users:", users.map(u => ({ login: u.login, email: u.email, hasPassword: !!u.passwordHash })));
-  }
+    if (!user) {
+      console.error("❌ User not found:", loginValue);
+      console.error("📋 Available users:", users.map(u => ({ login: u.login, email: u.email, hasPassword: !!u.passwordHash })));
+    }
 
-  // Parol tekshirish
-  const passwordValid = user ? verifyPassword(parsed.data.password, user.passwordHash) : false;
-  
-  if (!user || !passwordValid) {
-    console.error("❌ Auth failed:", { 
-      userFound: !!user, 
-      passwordValid,
-      userEmail: user?.email,
-      userLogin: user?.login,
-      hasPasswordHash: !!user?.passwordHash
+    // Parol tekshirish
+    const passwordValid = user ? verifyPassword(parsed.data.password, user.passwordHash) : false;
+    
+    if (!user || !passwordValid) {
+      console.error("❌ Auth failed:", { 
+        userFound: !!user, 
+        passwordValid,
+        userEmail: user?.email,
+        userLogin: user?.login,
+        hasPasswordHash: !!user?.passwordHash
+      });
+      return res
+        .status(401)
+        .json({ success: false, message: "Login yoki parol noto'g'ri" });
+    }
+
+    if (user.status === "suspended") {
+      console.warn("⚠️ User suspended:", user.email);
+      return res.status(403).json({
+        success: false,
+        message: "Hisobingiz to'xtatilgan. Administratorga murojaat qiling.",
+      });
+    }
+
+    user.lastLogin = new Date().toISOString();
+    const token = createSession(user.id);
+
+    console.log("✅ Login successful:", { user: user.email, token: token.substring(0, 10) + "..." });
+
+    recordAudit({
+      user,
+      action: "login",
+      entity: "auth",
+      summary: `${user.name} tizimga kirdi`,
+      ip: clientIp(req),
     });
-    return res
-      .status(401)
-      .json({ success: false, message: "Login yoki parol noto'g'ri" });
-  }
 
-  if (user.status === "suspended") {
-    console.warn("⚠️ User suspended:", user.email);
-    return res.status(403).json({
-      success: false,
-      message: "Hisobingiz to'xtatilgan. Administratorga murojaat qiling.",
+    const response: ApiResponse<LoginResponse> = {
+      success: true,
+      data: { token, user: toPublicUser(user) },
+      message: "Tizimga muvaffaqiyatli kirdingiz",
+    };
+    res.json(response);
+  } catch (error) {
+    console.error("❌ LOGIN EXCEPTION:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server xatosi: " + (error instanceof Error ? error.message : "Unknown error")
     });
   }
-
-  user.lastLogin = new Date().toISOString();
-  const token = createSession(user.id);
-
-  console.log("✅ Login successful:", { user: user.email, token: token.substring(0, 10) + "..." });
-
-  recordAudit({
-    user,
-    action: "login",
-    entity: "auth",
-    summary: `${user.name} tizimga kirdi`,
-    ip: clientIp(req),
-  });
-
-  const response: ApiResponse<LoginResponse> = {
-    success: true,
-    data: { token, user: toPublicUser(user) },
-    message: "Tizimga muvaffaqiyatli kirdingiz",
-  };
-  res.json(response);
 };
 
 export const logout: RequestHandler = (req, res) => {
