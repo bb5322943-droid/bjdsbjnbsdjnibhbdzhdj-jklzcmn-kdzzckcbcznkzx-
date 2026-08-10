@@ -1,0 +1,99 @@
+╔══════════════════════════════════════════════════════════╗
+║       FUSION ERP - TEZKOR DEPLOYMENT QOLLANMA            ║
+╚══════════════════════════════════════════════════════════╝
+
+Men loyihani deploy qilishga tayyor qildim! Endi siz 3 ta oddiy qadamni bajaring:
+
+═══════════════════════════════════════════════════════════
+📦 QADAM 1: GITHUB REPOSITORY YARATING (2 daqiqa)
+═══════════════════════════════════════════════════════════
+
+1. Bu havolani oching: https://github.com/new
+
+2. Sozlamalar:
+   ✓ Repository name: fusion-erp
+   ✓ Public yoki Private (istagan)
+   ⚠️ "Add README" - BOSHMANG!
+   ✓ "Create repository" tugmasini bosing
+
+3. Terminalda ishga tushiring:
+
+   git remote remove origin
+   git remote add origin https://github.com/SIZNING_USERNAME/fusion-erp.git
+   git push -u origin main
+
+   (SIZNING_USERNAME ni o'z GitHub username'ingiz bilan almashtiring!)
+
+═══════════════════════════════════════════════════════════
+🚀 QADAM 2: VERCEL'GA DEPLOY QILING (3 daqiqa)
+═══════════════════════════════════════════════════════════
+
+1. Bu havolani oching: https://vercel.com/new
+
+2. GitHub repository'ni import qiling
+
+3. Environment Variables qo'shing:
+
+┌─────────────────────────┬──────────────────────────────────────────┐
+│ Variable Name           │ Value                                    │
+├─────────────────────────┼──────────────────────────────────────────┤
+│ JWT_SECRET              │ 50f2ce5d70bae118960269e8547b56d9ad3a947 │
+│                         │ fb08f090d590e355b8c0d1244                │
+├─────────────────────────┼──────────────────────────────────────────┤
+│ JWT_REFRESH_SECRET      │ c9d6ec70117272926551e6b9d6b4138 39bfa44 │
+│                         │ d11df014a1213bff44d89b21ef                │
+├─────────────────────────┼──────────────────────────────────────────┤
+│ ADMIN_EMAIL             │ admin@yourcompany.com                    │
+├─────────────────────────┼──────────────────────────────────────────┤
+│ ADMIN_PASSWORD          │ Admin123!Strong                          │
+├─────────────────────────┼──────────────────────────────────────────┤
+│ NODE_ENV                │ production                               │
+└─────────────────────────┴──────────────────────────────────────────┘
+
+4. "Deploy" tugmasini bosing va 2-3 daqiqa kuting
+
+═══════════════════════════════════════════════════════════
+✅ QADAM 3: CORS SOZLANG (1 daqiqa)
+═══════════════════════════════════════════════════════════
+
+Deploy tugagach:
+
+1. Vercel URL'ingizni ko'chirib oling (masalan: https://fusion-erp-xyz.vercel.app)
+
+2. Vercel dashboard'da:
+   Settings > Environment Variables
+
+3. Yangi variable qo'shing:
+   Name: ALLOWED_ORIGINS
+   Value: https://fusion-erp-xyz.vercel.app (o'z URL'ingiz)
+
+4. Redeploy qiling:
+   Deployments > ... (3 nuqta) > Redeploy
+
+═══════════════════════════════════════════════════════════
+🎉 TAYYOR! Loyiha ishga tushdi!
+═══════════════════════════════════════════════════════════
+
+Test qiling:
+1. Vercel URL'ingizni brauzerda oching
+2. Login qiling:
+   Email: admin@yourcompany.com
+   Password: Admin123!Strong
+
+3. Parolni darhol o'zgartiring! (Profile > Change Password)
+
+═══════════════════════════════════════════════════════════
+📞 YORDAM
+═══════════════════════════════════════════════════════════
+
+Agar muammo bo'lsa:
+- DEPLOY_NOW.md - batafsil qo'llanma
+- generate-secrets.ps1 - yangi secret'lar generate qilish
+
+Xato ko'rsangiz:
+- Vercel Logs tekshiring: Deployments > Logs
+- Environment Variables to'g'riligini tasdiqlang
+
+════════════════════════════════════════════════════════════
+
+Omad! 🚀 Men loyihani tayyor qildim, qolganini siz qilasiz!
