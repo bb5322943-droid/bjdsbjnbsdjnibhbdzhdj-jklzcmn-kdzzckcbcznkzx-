@@ -10,6 +10,8 @@ import {
   hashPassword,
   resolveSession,
   verifyPassword,
+  createAccessToken,
+  verifyAccessToken,
 } from "../lib/auth";
 import { sendValidationError } from "../lib/http";
 import { clientIp, recordAudit } from "../lib/audit";
@@ -151,20 +153,29 @@ export const login: RequestHandler = (req, res) => {
       });
     }
 
-    // 7. Session yaratish
+    // 7. JWT Token yaratish (Vercel serverless uchun)
     let token: string;
     try {
       user.lastLogin = new Date().toISOString();
-      token = createSession(user.id);
-      console.log("✅ Session created:", { 
-        userId: user.id, 
-        tokenPrefix: token.substring(0, 10) + "..." 
+      
+      // JWT token (stateless - database kerak emas!)
+      token = createAccessToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
       });
-    } catch (sessionError) {
-      console.error("❌ Session creation error:", sessionError);
+      
+      console.log("✅ JWT token created:", { 
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tokenPrefix: token.substring(0, 20) + "..." 
+      });
+    } catch (tokenError) {
+      console.error("❌ Token creation error:", tokenError);
       return res.status(500).json({
         success: false,
-        message: "Server xatosi: Sessiya yaratishda xatolik"
+        message: "Server xatosi: Token yaratishda xatolik"
       });
     }
 
@@ -221,11 +232,35 @@ export const logout: RequestHandler = (req, res) => {
 
 /** Joriy sessiya egasi — sahifa yangilanganda holatni tiklash uchun. */
 export const getCurrentUser: RequestHandler = (req, res) => {
-  const user = req.currentUser;
-  if (!user) {
-    return res.status(401).json({ success: false, message: "Sessiya topilmadi" });
+  console.log("👤 getCurrentUser called");
+  
+  const token = extractToken(req.headers.authorization);
+  console.log("   Token:", token ? "present" : "missing");
+
+  if (!token) {
+    console.error("   ❌ No token");
+    return res.status(401).json({ success: false, message: "Token topilmadi" });
   }
 
+  // JWT verify
+  const payload = verifyAccessToken(token);
+  console.log("   JWT payload:", payload ? `userId=${payload.userId}` : "null");
+
+  if (!payload) {
+    console.error("   ❌ Invalid JWT");
+    return res.status(401).json({ success: false, message: "Token yaroqsiz" });
+  }
+
+  // User topish
+  const user = users.find((item) => item.id === payload.userId && !item.deletedAt);
+  console.log("   User found:", user ? user.email : "null");
+
+  if (!user) {
+    console.error("   ❌ User not found");
+    return res.status(401).json({ success: false, message: "Foydalanuvchi topilmadi" });
+  }
+
+  console.log("   ✅ getCurrentUser success:", user.email);
   const response: ApiResponse<User> = { success: true, data: toPublicUser(user) };
   res.json(response);
 };
@@ -265,7 +300,7 @@ export const changePassword: RequestHandler = (req, res) => {
 
 /**
  * Sessiyani tekshiruvchi middleware.
- * Token yaroqli bo'lsa foydalanuvchini `req.currentUser` ga qo'yadi.
+ * JWT token'ni verify qiladi (stateless - Vercel serverless uchun).
  */
 export const requireAuth: RequestHandler = (req, res, next) => {
   console.log("🔐 requireAuth middleware called");
@@ -274,24 +309,31 @@ export const requireAuth: RequestHandler = (req, res, next) => {
   console.log("   Authorization header:", req.headers.authorization ? "present" : "missing");
   
   const token = extractToken(req.headers.authorization);
-  console.log("   Token extracted:", token ? `${token.substring(0, 10)}...` : "null");
-  
-  const userId = token ? resolveSession(token) : null;
-  console.log("   User ID from session:", userId || "null");
+  console.log("   Token extracted:", token ? `${token.substring(0, 20)}...` : "null");
 
-  if (!userId) {
-    console.error("❌ requireAuth failed: No userId");
+  if (!token) {
+    console.error("❌ requireAuth failed: No token");
     return res
       .status(401)
       .json({ success: false, message: "Avtorizatsiya talab qilinadi" });
   }
 
-  const user = users.find((item) => item.id === userId && !item.deletedAt);
-  console.log("   User found in database:", user ? user.email : "null");
+  // JWT verify (stateless - database query yo'q!)
+  const payload = verifyAccessToken(token);
+  console.log("   JWT payload:", payload ? `userId=${payload.userId}` : "null (invalid token)");
+
+  if (!payload) {
+    console.error("❌ requireAuth failed: Invalid JWT token");
+    return res
+      .status(401)
+      .json({ success: false, message: "Token yaroqsiz yoki muddati o'tgan" });
+  }
+
+  // User'ni in-memory array'dan topish (tez - database query yo'q)
+  const user = users.find((item) => item.id === payload.userId && !item.deletedAt);
+  console.log("   User found in memory:", user ? user.email : "null");
   
   if (!user || user.status === "suspended") {
-    // Hisob o'chirilgan yoki bloklangan bo'lsa sessiya ham yaroqsiz.
-    if (token) destroySession(token);
     console.error("❌ requireAuth failed: User not found or suspended");
     return res
       .status(401)
