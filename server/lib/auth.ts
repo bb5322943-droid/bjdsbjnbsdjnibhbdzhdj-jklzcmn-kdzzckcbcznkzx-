@@ -125,18 +125,39 @@ export function createSession(userId: string): string {
 
 /** Token bo'yicha foydalanuvchi ID sini qaytaradi; muddati o'tgan bo'lsa null. */
 export function resolveSession(token: string): string | null {
-  const row = db()
-    .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
-    .get(token) as { userId: string; expiresAt: number } | undefined;
+  console.log("🔍 resolveSession called");
+  console.log("   Token:", token ? `${token.substring(0, 10)}...` : "null");
+  
+  try {
+    const row = db()
+      .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
+      .get(token) as { userId: string; expiresAt: number } | undefined;
 
-  if (!row) return null;
+    console.log("   Session row from DB:", row ? "found" : "not found");
+    
+    if (!row) {
+      console.log("   ❌ Session not found in database");
+      return null;
+    }
 
-  if (row.expiresAt < Date.now()) {
-    destroySession(token);
+    const now = Date.now();
+    const expired = row.expiresAt < now;
+    console.log("   Session expires at:", new Date(row.expiresAt).toISOString());
+    console.log("   Current time:", new Date(now).toISOString());
+    console.log("   Expired:", expired);
+
+    if (expired) {
+      destroySession(token);
+      console.log("   ❌ Session expired and deleted");
+      return null;
+    }
+
+    console.log("   ✅ Session valid, userId:", row.userId);
+    return row.userId;
+  } catch (error) {
+    console.error("   ❌ resolveSession error:", error);
     return null;
   }
-
-  return row.userId;
 }
 
 export function destroySession(token: string): void {

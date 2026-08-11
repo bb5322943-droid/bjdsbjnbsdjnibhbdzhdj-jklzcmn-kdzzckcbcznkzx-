@@ -1,0 +1,228 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║          ORBIS ERP - BARCHA FOYDALANUVCHILAR                      ║
+║              LOGIN VA PAROL MA'LUMOTLARI                          ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════
+👥 JAMI: 4 TA FOYDALANUVCHI
+═══════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. ADMIN (Administrator)                                        │
+└─────────────────────────────────────────────────────────────────┘
+
+    Login:    admin
+              yoki
+              admin@orbiserp.uz
+
+    Parol:    OrbisAdmin2024!
+
+    Role:     admin (to'liq huquq)
+    Status:   active
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. MANAGER (Menejer)                                            │
+└─────────────────────────────────────────────────────────────────┘
+
+    Login:    menejr
+              yoki
+              menejr@test.uz
+
+    Parol:    123456
+
+    Role:     manager
+    Status:   active
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. ACCOUNTANT (Hisobchi)                                        │
+└─────────────────────────────────────────────────────────────────┘
+
+    Login:    hisobchi
+              yoki
+              hisobchi@test.uz
+
+    Parol:    123456
+
+    Role:     accountant
+    Status:   active
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. CASHIER (Kassir)                                             │
+└─────────────────────────────────────────────────────────────────┘
+
+    Login:    kassir
+              yoki
+              kassir@test.uz
+
+    Parol:    123456
+
+    Role:     cashier
+    Status:   active
+
+
+═══════════════════════════════════════════════════════════════════
+📊 ROLLAR VA HUQUQLAR
+═══════════════════════════════════════════════════════════════════
+
+1. ADMIN (Administrator)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ✅ To'liq huquq
+   ✅ Barcha modullar
+   ✅ Foydalanuvchilarni boshqarish
+   ✅ Tizim sozlamalari
+   ✅ Hisobotlar (barcha)
+
+2. MANAGER (Menejer)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ✅ Buyurtmalar
+   ✅ Mijozlar
+   ✅ Mahsulotlar
+   ✅ Hisobotlar (cheklangan)
+   ❌ Moliya ma'lumotlari
+   ❌ Foydalanuvchilar
+
+3. ACCOUNTANT (Hisobchi)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ✅ Moliya
+   ✅ Tranzaksiyalar
+   ✅ Hisob-fakturalar
+   ✅ Hisobotlar (moliya)
+   ❌ Buyurtmalar
+   ❌ Foydalanuvchilar
+
+4. CASHIER (Kassir)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ✅ Savdo
+   ✅ Kassa
+   ✅ Tolovlar
+   ❌ Hisobotlar
+   ❌ Sozlamalar
+   ❌ Foydalanuvchilar
+
+
+═══════════════════════════════════════════════════════════════════
+🔐 XAVFSIZLIK ESLATMALARI
+═══════════════════════════════════════════════════════════════════
+
+⚠️  MUHIM:
+
+1. Admin parolni o'zgartiring!
+   Default parol: OrbisAdmin2024!
+   Production'da xavfli!
+
+2. Demo foydalanuvchilar parolini o'zgartiring!
+   Default parol: 123456
+   Juda zaif!
+
+3. Har bir xodimga alohida login yarating
+   Demo foydalanuvchilarni ishlatmang
+
+4. Muntazam ravishda parollarni yangilang
+   Kamida 3 oyda bir marta
+
+5. Parollar talablari:
+   ✅ Kamida 8 belgi
+   ✅ Katta va kichik harflar
+   ✅ Raqamlar
+   ✅ Maxsus belgilar (!@#$%^&*)
+
+
+═══════════════════════════════════════════════════════════════════
+🎯 LOGIN QILISH (Localhost)
+═══════════════════════════════════════════════════════════════════
+
+1. Server ishga tushirish:
+   pnpm dev
+
+2. Browser'da ochish:
+   http://localhost:5173
+
+3. Login sahifasida kiriting:
+   Login: admin (yoki boshqa)
+   Parol: OrbisAdmin2024! (yoki 123456)
+
+4. Dashboard'ga o'tasiz
+
+
+═══════════════════════════════════════════════════════════════════
+🚀 LOGIN QILISH (Production - Vercel)
+═══════════════════════════════════════════════════════════════════
+
+1. Saytni oching:
+   https://fusion-erp.vercel.app
+
+2. Login sahifasida kiriting:
+   Login: admin
+   Parol: OrbisAdmin2024!
+
+3. F12 → Console (Debug uchun)
+
+⚠️  Eslatma: Vercel'da har request yangi database
+   Demo foydalanuvchilar har safar qayta yaratiladi
+
+
+═══════════════════════════════════════════════════════════════════
+📝 QISQACHA JADVAL
+═══════════════════════════════════════════════════════════════════
+
+┌──────────────┬─────────────┬──────────────────────┬────────────┐
+│ Rol          │ Login       │ Email                │ Parol      │
+├──────────────┼─────────────┼──────────────────────┼────────────┤
+│ Admin        │ admin       │ admin@orbiserp.uz    │ Orbis...!  │
+│ Manager      │ menejr      │ menejr@test.uz       │ 123456     │
+│ Accountant   │ hisobchi    │ hisobchi@test.uz     │ 123456     │
+│ Cashier      │ kassir      │ kassir@test.uz       │ 123456     │
+└──────────────┴─────────────┴──────────────────────┴────────────┘
+
+
+═══════════════════════════════════════════════════════════════════
+✅ PAROL O'ZGARTIRISH
+═══════════════════════════════════════════════════════════════════
+
+1. Tizimga kirish (login qilish)
+
+2. O'ng yuqori burchak → Profil
+
+3. Sozlamalar → Parolni o'zgartirish
+
+4. Joriy parol → Yangi parol → Tasdiqlash
+
+5. Saqlash
+
+⚠️  Yangi parol talablari:
+   - Kamida 8 belgi
+   - Katta harf (A-Z)
+   - Kichik harf (a-z)
+   - Raqam (0-9)
+   - Maxsus belgi (!@#$%^&*)
+
+
+═══════════════════════════════════════════════════════════════════
+📞 YORDAM
+═══════════════════════════════════════════════════════════════════
+
+Agar login qilishda muammo bo'lsa:
+
+1. Parolni tekshiring (katta/kichik harf muhim)
+
+2. Login to'g'riligini tekshiring
+
+3. Console'ni oching (F12) - xato sababi ko'rinadi
+
+4. Database mavjudligini tekshiring:
+   node check-admin.mjs
+
+5. Admin'ni qayta yaratish:
+   node direct-update.mjs
+
+
+═══════════════════════════════════════════════════════════════════
+
+Yaratilgan sana: 2026-08-11
+Versiya: 1.0
+Loyiha: Orbis ERP
+
+═══════════════════════════════════════════════════════════════════

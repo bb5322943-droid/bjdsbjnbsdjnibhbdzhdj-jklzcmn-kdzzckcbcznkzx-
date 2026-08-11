@@ -268,24 +268,37 @@ export const changePassword: RequestHandler = (req, res) => {
  * Token yaroqli bo'lsa foydalanuvchini `req.currentUser` ga qo'yadi.
  */
 export const requireAuth: RequestHandler = (req, res, next) => {
+  console.log("🔐 requireAuth middleware called");
+  console.log("   URL:", req.url);
+  console.log("   Method:", req.method);
+  console.log("   Authorization header:", req.headers.authorization ? "present" : "missing");
+  
   const token = extractToken(req.headers.authorization);
+  console.log("   Token extracted:", token ? `${token.substring(0, 10)}...` : "null");
+  
   const userId = token ? resolveSession(token) : null;
+  console.log("   User ID from session:", userId || "null");
 
   if (!userId) {
+    console.error("❌ requireAuth failed: No userId");
     return res
       .status(401)
       .json({ success: false, message: "Avtorizatsiya talab qilinadi" });
   }
 
   const user = users.find((item) => item.id === userId && !item.deletedAt);
+  console.log("   User found in database:", user ? user.email : "null");
+  
   if (!user || user.status === "suspended") {
     // Hisob o'chirilgan yoki bloklangan bo'lsa sessiya ham yaroqsiz.
     if (token) destroySession(token);
+    console.error("❌ requireAuth failed: User not found or suspended");
     return res
       .status(401)
       .json({ success: false, message: "Hisob mavjud emas yoki to'xtatilgan" });
   }
 
+  console.log("✅ requireAuth success:", user.email);
   req.currentUser = user;
   next();
 };
