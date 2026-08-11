@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Star, Truck } from "lucide-react";
+import { Plus, RotateCcw, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Supplier } from "@shared/api";
 import {
@@ -37,6 +37,7 @@ import {
   useSupplierCategories,
   useSupplierStats,
   useSuppliers,
+  useUpdateSupplier,
 } from "@/hooks/use-api";
 import { useDebounced } from "@/hooks/use-debounced";
 import { formatNumber, formatUzPhone } from "@/lib/format";
@@ -76,6 +77,7 @@ export default function Suppliers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewing, setViewing] = useState<Supplier | null>(null);
   const [deleting, setDeleting] = useState<Supplier | null>(null);
+  const [restoring, setRestoring] = useState<Supplier | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -90,6 +92,7 @@ export default function Suppliers() {
     status: status === ALL ? undefined : (status as Supplier["status"]),
   });
   const deleteSupplier = useDeleteSupplier();
+  const updateSupplier = useUpdateSupplier();
 
   const stats = statsData?.data;
   const suppliers = data?.data ?? [];
@@ -109,6 +112,16 @@ export default function Suppliers() {
     if (!deleting) return;
     await deleteSupplier.mutateAsync(deleting.id);
     toast.success(`${deleting.name} kartotekadan o'chirildi`);
+  };
+
+  const handleRestore = async () => {
+    if (!restoring) return;
+    await updateSupplier.mutateAsync({
+      id: restoring.id,
+      status: "active",
+    });
+    toast.success(`${restoring.name} faollashtirилди`);
+    setRestoring(null);
   };
 
   const openCreate = () => {
@@ -194,8 +207,10 @@ export default function Suppliers() {
       cell: (supplier) => (
         <RowActions
           onView={() => setViewing(supplier)}
-          onEdit={() => openEdit(supplier)}
-          onDelete={() => setDeleting(supplier)}
+          onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
+          onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
+          onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
+          returnText="Qaytarish"
         />
       ),
     },
@@ -332,8 +347,10 @@ export default function Suppliers() {
                         <ViewButton onClick={() => setViewing(supplier)} />
                         <RowActions
                           onView={() => setViewing(supplier)}
-                          onEdit={() => openEdit(supplier)}
-                          onDelete={() => setDeleting(supplier)}
+                          onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
+                          onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
+                          onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
+                          returnText="Qaytarish"
                         />
                       </div>
                     </div>
@@ -493,6 +510,20 @@ export default function Suppliers() {
         confirmText="O'chirish"
         destructive
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={Boolean(restoring)}
+        onOpenChange={(open) => !open && setRestoring(null)}
+        title="Ta'minotchini qaytarish"
+        description={
+          <>
+            <b>{restoring?.name}</b> faollashtirilib, qayta ishlatish uchun
+            tayyorlanadi.
+          </>
+        }
+        confirmText="Qaytarish"
+        onConfirm={handleRestore}
       />
     </>
   );
