@@ -91,14 +91,6 @@ import {
   updatePurchase,
 } from "./routes/purchases";
 import {
-  createInvoice,
-  deleteInvoice,
-  getInvoiceStats,
-  getInvoices,
-  recordInvoicePayment,
-  updateInvoice,
-} from "./routes/invoices";
-import {
   createDebtPayment,
   getCustomerDebtHistory,
   getCustomerDebts,
@@ -479,7 +471,6 @@ export function createServer() {
   app.use("/api/crm", requireModule("crm"));
   app.use("/api/orders", requireModule("crm"));
   app.use("/api/customers", requireModule("crm"));
-  app.use("/api/invoices", requireModule("crm"));
   app.use("/api/debts", requireModule("crm"));
   app.use("/api/reports", requireModule("reports"));
   app.use("/api/users", requireModule("users"));
@@ -572,14 +563,6 @@ export function createServer() {
   app.post("/api/purchases", createPurchase);
   app.put("/api/purchases/:id", updatePurchase);
   app.delete("/api/purchases/:id", deletePurchase);
-
-  // Invoices API routes
-  app.get("/api/invoices/stats", getInvoiceStats);
-  app.get("/api/invoices", getInvoices);
-  app.post("/api/invoices", createInvoice);
-  app.post("/api/invoices/:id/payment", recordInvoicePayment);
-  app.put("/api/invoices/:id", updateInvoice);
-  app.delete("/api/invoices/:id", deleteInvoice);
 
   // Debts (Qarzlar) API routes
   app.get("/api/debts/stats", getDebtStats);

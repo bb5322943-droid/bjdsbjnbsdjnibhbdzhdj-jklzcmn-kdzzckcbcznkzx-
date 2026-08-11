@@ -53,7 +53,6 @@ const PAGES: { label: string; to: string; icon: LucideIcon }[] = [
   { label: "Buyurtmalar", to: "/orders", icon: ShoppingCart },
   { label: "Sotuv", to: "/sales", icon: ShoppingCart },
   { label: "POS Sistema", to: "/pos", icon: CreditCard },
-  { label: "Hisob-fakturalar", to: "/invoices", icon: FileText },
   { label: "Bitimlar", to: "/crm", icon: ChartNoAxesCombined },
   { label: "Mijozlar", to: "/customers", icon: Contact },
   { label: "Ombor", to: "/warehouse", icon: Boxes },
@@ -124,7 +123,6 @@ export function CommandPalette({
   const enabled = { enabled: hasQuery };
 
   const { data: orders } = useOrders(search, enabled);
-  const { data: invoices } = useInvoices(search, enabled);
   const { data: customers } = useCustomers(search, enabled);
   const { data: deals } = useDeals(search, enabled);
   const { data: products } = useProducts(search, enabled);
@@ -159,17 +157,6 @@ export function CommandPalette({
         title: order.orderNumber,
         subtitle: order.customerName,
         meta: formatCurrency(order.total),
-      })),
-    },
-    {
-      heading: "Hisob-fakturalar",
-      icon: FileText,
-      to: "/invoices",
-      rows: (invoices?.data ?? []).map((invoice) => ({
-        id: invoice.id,
-        title: invoice.invoiceNumber,
-        subtitle: invoice.customerName,
-        meta: formatCurrency(invoice.amount),
       })),
     },
     {

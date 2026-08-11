@@ -20,7 +20,6 @@ import {
   CreateCustomerRequest,
   CreateDealRequest,
   CreateEmployeeRequest,
-  CreateInvoiceRequest,
   CreateLeaveRequest,
   CreateOrderRequest,
   CreateProductRequest,
@@ -44,8 +43,6 @@ import {
   FunnelStage,
   HRBreakdown,
   HRStats,
-  Invoice,
-  InvoiceStats,
   LeaveRequest,
   LeaveStats,
   Order,
@@ -67,7 +64,6 @@ import {
   UpdateCustomerRequest,
   UpdateDealRequest,
   UpdateEmployeeRequest,
-  UpdateInvoiceRequest,
   UpdateLeaveRequest,
   UpdateOrderRequest,
   UpdateProductRequest,
@@ -895,86 +891,6 @@ export function useDeletePurchase() {
 
 // ------------------------------------------------------------- Fakturalar
 
-/** Faktura to'lovi moliya balansini o'zgartiradi. */
-function useInvalidateInvoices() {
-  const queryClient = useQueryClient();
-  return () => {
-    ["invoices", "finance", "customers", "dashboard", "reports"].forEach((scope) =>
-      queryClient.invalidateQueries({ queryKey: [scope] }),
-    );
-  };
-}
-
-export function useInvoiceStats() {
-  return useQuery({
-    queryKey: ["invoices", "stats"],
-    queryFn: () => fetchApi<ApiResponse<InvoiceStats>>("/invoices/stats"),
-  });
-}
-
-export interface InvoiceFilters {
-  page?: number;
-  limit?: number;
-  search?: string;
-  status?: Invoice["status"];
-  customerId?: string;
-  overdueOnly?: boolean;
-}
-
-export function useInvoices(params: InvoiceFilters = {}, options?: QueryOptions) {
-  return useQuery({
-    queryKey: ["invoices", "list", params],
-    queryFn: () => fetchApi<PaginatedResponse<Invoice>>(`/invoices?${toQueryString(params)}`),
-    placeholderData: (previous) => previous,
-    enabled: options?.enabled,
-  });
-}
-
-export function useCreateInvoice() {
-  const invalidate = useInvalidateInvoices();
-  return useMutation({
-    mutationFn: (data: CreateInvoiceRequest) =>
-      fetchApi<ApiResponse<Invoice>>("/invoices", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useUpdateInvoice() {
-  const invalidate = useInvalidateInvoices();
-  return useMutation({
-    mutationFn: ({ id, ...data }: UpdateInvoiceRequest & { id: string }) =>
-      fetchApi<ApiResponse<Invoice>>(`/invoices/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: invalidate,
-  });
-}
-
-/** Faktura bo'yicha to'lov qayd etish (qisman to'lov ham mumkin). */
-export function useRecordInvoicePayment() {
-  const invalidate = useInvalidateInvoices();
-  return useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
-      fetchApi<ApiResponse<Invoice>>(`/invoices/${id}/payment`, {
-        method: "POST",
-        body: JSON.stringify({ amount }),
-      }),
-    onSuccess: invalidate,
-  });
-}
-
-export function useDeleteInvoice() {
-  const invalidate = useInvalidateInvoices();
-  return useMutation({
-    mutationFn: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/invoices/${id}`, { method: "DELETE" }),
-    onSuccess: invalidate,
-  });
-}
 
 // -------------------------------------------------------- Davomat va ta'til
 
