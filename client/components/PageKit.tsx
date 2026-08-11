@@ -4,6 +4,7 @@ import {
   List,
   LucideIcon,
   Pencil,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -173,18 +174,23 @@ export function ViewToggle({
 /** Jadval qatoridagi "..." menyusi: tahrirlash va o'chirish. */
 export function RowActions({
   onView,
+  onReturn,
   onEdit,
   onDelete,
+  returnText = "Qaytarish",
   editText = "Tahrirlash",
   deleteText = "O'chirish",
   children,
 }: {
   /** Berilsa — menyuga "Batafsil ko'rish" bandi qo'shiladi. */
   onView?: () => void;
+  /** Berilsa — menyuga "Qaytarish" bandi qo'shiladi. */
+  onReturn?: () => void;
   /** Berilmasa — "Tahrirlash" bandi ko'rsatilmaydi (masalan, to'langan hujjat). */
   onEdit?: () => void;
   /** Berilmasa — "O'chirish" bandi ko'rsatilmaydi. */
   onDelete?: () => void;
+  returnText?: string;
   editText?: string;
   deleteText?: string;
   /** Modulga xos qo'shimcha amallar. */
@@ -215,6 +221,11 @@ export function RowActions({
           </DropdownMenuItem>
         )}
         {children}
+        {onReturn && (
+          <DropdownMenuItem onSelect={onReturn} className="gap-2">
+            <RotateCcw size={15} /> {returnText}
+          </DropdownMenuItem>
+        )}
         {onEdit && (
           <DropdownMenuItem onSelect={onEdit} className="gap-2">
             <Pencil size={15} /> {editText}

@@ -215,9 +215,7 @@ export default function Sales() {
       cell: (sale) => (
         <RowActions
           onView={() => setViewing(sale)}
-          onEdit={() => {}}
-          onDelete={() => setRefunding(sale)}
-          deleteLabel="Qaytarish"
+          onReturn={() => setRefunding(sale)}
         />
       ),
     },
@@ -425,9 +423,7 @@ export default function Sales() {
                         <ViewButton onClick={() => setViewing(sale)} />
                         <RowActions
                           onView={() => setViewing(sale)}
-                          onEdit={() => {}}
-                          onDelete={() => setRefunding(sale)}
-                          deleteLabel="Qaytarish"
+                          onReturn={() => setRefunding(sale)}
                         />
                       </div>
                     </div>

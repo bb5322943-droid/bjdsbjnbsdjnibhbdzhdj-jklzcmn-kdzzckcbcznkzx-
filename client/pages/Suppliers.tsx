@@ -458,16 +458,24 @@ export default function Suppliers() {
         }
         actions={
           viewing && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                const supplier = viewing;
-                setViewing(null);
-                openEdit(supplier);
-              }}
-            >
-              Tahrirlash
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setViewing(null)}
+              >
+                Qaytish
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const supplier = viewing;
+                  setViewing(null);
+                  openEdit(supplier);
+                }}
+              >
+                Tahrirlash
+              </Button>
+            </div>
           )
         }
       />
