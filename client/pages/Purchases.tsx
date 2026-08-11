@@ -4,6 +4,7 @@ import {
   CircleX,
   PackageCheck,
   Plus,
+  RotateCcw,
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -86,6 +87,7 @@ export default function Purchases() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewing, setViewing] = useState<Purchase | null>(null);
   const [deleting, setDeleting] = useState<Purchase | null>(null);
+  const [returning, setReturning] = useState<Purchase | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -142,6 +144,22 @@ export default function Purchases() {
     }
   };
 
+  const handleReturn = async () => {
+    if (!returning) return;
+    try {
+      await updatePurchase.mutateAsync({
+        id: returning.id,
+        status: "cancelled",
+        note: `Qaytarildi: ${returning.note || ""}`.trim(),
+      });
+      toast.success(`${returning.purchaseNumber} qaytarildi`);
+      setReturning(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Xatolik yuz berdi");
+      throw err;
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     setDialogOpen(true);
@@ -175,6 +193,17 @@ export default function Purchases() {
         >
           <PackageCheck size={15} className="text-[#2d7d64]" /> Tovarni qabul
           qilish
+        </DropdownMenuItem>,
+      );
+    }
+    if (purchase.status === "received") {
+      items.push(
+        <DropdownMenuItem
+          key="return"
+          onSelect={() => setReturning(purchase)}
+          className="gap-2"
+        >
+          <RotateCcw size={15} className="text-[#cb8535]" /> Tovarni qaytarish
         </DropdownMenuItem>,
       );
     }
@@ -612,6 +641,24 @@ export default function Purchases() {
         confirmText="O'chirish"
         destructive
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={Boolean(returning)}
+        onOpenChange={(open) => !open && setReturning(null)}
+        title="Tovarni qaytarish"
+        description={
+          <>
+            <b>{returning?.purchaseNumber}</b> qaytariladi. Mahsulotlar
+            ombor hisobidan chiqariladi va xarid bekor qilingan deb belgilanadi.
+            <br />
+            <br />
+            <b>Diqqat:</b> Bu amal ortga qaytarilmaydi!
+          </>
+        }
+        confirmText="Qaytarish"
+        destructive
+        onConfirm={handleReturn}
       />
     </>
   );
