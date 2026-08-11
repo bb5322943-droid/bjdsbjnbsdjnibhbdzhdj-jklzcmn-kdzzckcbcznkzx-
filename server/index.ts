@@ -64,6 +64,7 @@ import {
   getSupplierDetail,
   getSupplierStats,
   getSuppliers,
+  getSuppliersWithProducts,
   updateSupplier,
 } from "./routes/suppliers";
 import {

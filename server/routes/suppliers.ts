@@ -75,6 +75,36 @@ export const getSupplierDetail: RequestHandler = (req, res) => {
   });
 };
 
+/** Har bir ta'minotchining yetkazadigan mahsulotlar soni */
+export const getSuppliersWithProducts: RequestHandler = (req, res) => {
+  const query = querySchema.parse(req.query);
+  const search = query.search.toLowerCase();
+
+  const filtered = active(suppliers).filter((s) => {
+    if (
+      search &&
+      !s.name.toLowerCase().includes(search) &&
+      !s.contactPerson.toLowerCase().includes(search) &&
+      !s.category.toLowerCase().includes(search) &&
+      !s.email.toLowerCase().includes(search)
+    ) {
+      return false;
+    }
+    if (query.category && s.category !== query.category) return false;
+    if (query.status && s.status !== query.status) return false;
+    return true;
+  });
+
+  // Har bir supplier uchun products sonini qo'shamiz
+  const withProducts = filtered.map((s) => ({
+    ...s,
+    productsCount: active(products).filter((p) => p.supplier === s.name).length,
+    products: active(products).filter((p) => p.supplier === s.name),
+  }));
+
+  res.json(paginate(withProducts, query.page, query.limit));
+};
+
 export const createSupplier: RequestHandler = (req, res) => {
   const parsed = supplierSchema.safeParse(req.body);
   if (!parsed.success) return sendValidationError(res, parsed.error);

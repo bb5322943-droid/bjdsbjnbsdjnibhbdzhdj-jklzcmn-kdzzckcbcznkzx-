@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import {
   useDeleteSupplier,
+  useProducts,
   useSupplierCategories,
   useSupplierStats,
   useSuppliers,
@@ -80,6 +81,7 @@ export default function Suppliers() {
 
   const { data: statsData, isLoading: statsLoading } = useSupplierStats();
   const { data: categoriesData } = useSupplierCategories();
+  const { data: productsData } = useProducts({ page: 1, limit: 1000 }); // Barcha mahsulotlar
   const { data, isLoading, isError, error, refetch } = useSuppliers({
     page,
     limit: 10,
@@ -93,6 +95,7 @@ export default function Suppliers() {
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
   const categories = categoriesData?.data ?? [];
+  const products = productsData?.data ?? [];
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -136,6 +139,18 @@ export default function Suppliers() {
           </div>
         </div>
       ),
+    },
+    {
+      header: "Tovarlar soni",
+      cell: (supplier) => {
+        const count = products.filter(p => p.supplier === supplier.name && !p.deletedAt).length;
+        return (
+          <div className="text-sm">
+            <span className="font-semibold text-slate-700">{count} ta</span>
+            <span className="ml-1 text-slate-400">tovar</span>
+          </div>
+        );
+      },
     },
     {
       header: "Aloqa shaxsi",
@@ -292,7 +307,12 @@ export default function Suppliers() {
                 rowKey={(supplier) => supplier.id}
                 isLoading={isLoading}
                 emptyText="Mos ta'minotchi topilmadi."
-                renderCard={(supplier) => (
+                renderCard={(supplier) => {
+                  const productCount = products.filter(
+                    p => p.supplier === supplier.name && !p.deletedAt
+                  ).length;
+                  
+                  return (
                   <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-3">
@@ -328,6 +348,12 @@ export default function Suppliers() {
                     </div>
                     <dl className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
                       <div className="flex justify-between gap-2">
+                        <dt className="text-slate-400">Tovarlar</dt>
+                        <dd className="font-semibold text-slate-700">
+                          {productCount} ta
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
                         <dt className="text-slate-400">Aloqa shaxsi</dt>
                         <dd className="truncate text-slate-600">
                           {supplier.contactPerson || "—"}
@@ -347,7 +373,7 @@ export default function Suppliers() {
                       </div>
                     </dl>
                   </div>
-                )}
+                );}}
               />
             )}
             {pagination && !isLoading && (
@@ -404,6 +430,28 @@ export default function Suppliers() {
                     { label: "Baho", value: `${viewing.rating} / 5` },
                     { label: "Manzil", value: viewing.address, full: true },
                   ],
+                },
+                {
+                  title: "Tovarlar",
+                  fields: (() => {
+                    const supplierProducts = products.filter(
+                      p => p.supplier === viewing.name && !p.deletedAt
+                    );
+                    
+                    if (supplierProducts.length === 0) {
+                      return [{ label: "", value: "Hech qanday tovar topilmadi", full: true }];
+                    }
+                    
+                    return supplierProducts.slice(0, 5).map(p => ({
+                      label: p.name,
+                      value: `${p.quantity} ta - ${formatNumber(p.price)} so'm`,
+                      full: true
+                    })).concat(
+                      supplierProducts.length > 5 
+                        ? [{ label: "", value: `va yana ${supplierProducts.length - 5} ta tovar...`, full: true }]
+                        : []
+                    );
+                  })(),
                 },
               ]
             : []
