@@ -34,26 +34,41 @@ import { DEFAULT_PASSWORD, hashPassword } from "../lib/auth";
  */
 
 // Bo'sh baza — birinchi ishga tushirish. Demo ma'lumotlar bir marta yoziladi.
-if (isEmpty()) {
-  const seed = buildSeedData();
-  writeTable("employees", seed.employees);
-  writeTable("products", seed.products);
-  writeTable("customers", seed.customers);
-  writeTable("suppliers", seed.suppliers);
-  writeTable("branches", seed.branches);
-  writeTable("orders", seed.orders);
-  writeTable("purchases", seed.purchases);
-  writeTable("invoices", seed.invoices);
-  writeTable("attendance", seed.attendance);
-  writeTable("leave_requests", seed.leaveRequests);
-  writeTable("users", seed.users);
-  writeTable("movements", seed.movements);
-  writeTable("deals", seed.deals);
-  writeTable("payrolls", seed.payrolls);
-  writeTable("transactions", seed.transactions);
-  writeTable("activities", seed.activities);
+console.log("🔍 Checking database state...");
+const dbEmpty = isEmpty();
+console.log(`📊 Database empty: ${dbEmpty}`);
+
+if (dbEmpty) {
+  console.log("🌱 Seeding database with demo data...");
+  try {
+    const seed = buildSeedData();
+    console.log("📝 Writing tables...");
+    writeTable("employees", seed.employees);
+    writeTable("products", seed.products);
+    writeTable("customers", seed.customers);
+    writeTable("suppliers", seed.suppliers);
+    writeTable("branches", seed.branches);
+    writeTable("orders", seed.orders);
+    writeTable("purchases", seed.purchases);
+    writeTable("invoices", seed.invoices);
+    writeTable("attendance", seed.attendance);
+    writeTable("leave_requests", seed.leaveRequests);
+    writeTable("users", seed.users);
+    writeTable("movements", seed.movements);
+    writeTable("deals", seed.deals);
+    writeTable("payrolls", seed.payrolls);
+    writeTable("transactions", seed.transactions);
+    writeTable("activities", seed.activities);
+    console.log("✅ Database seeded successfully");
+  } catch (seedError) {
+    console.error("❌ Database seeding failed:", seedError);
+    throw seedError;
+  }
+} else {
+  console.log("✅ Database already contains data");
 }
 
+console.log("📖 Reading tables from database...");
 export const employees: Employee[] = readTable<Employee>("employees");
 export const products: Product[] = readTable<Product>("products");
 export const customers: Customer[] = readTable<Customer>("customers");
@@ -73,6 +88,9 @@ export const activities: Activity[] = readTable<Activity>("activities");
 export const debtPayments: DebtPayment[] = readTable<DebtPayment>("debt_payments");
 export const sales: Sale[] = readTable<Sale>("sales");
 export const refunds: Refund[] = readTable<Refund>("refunds");
+
+console.log("✅ Tables loaded successfully");
+console.log(`📊 Data counts: users=${users?.length || 0}, employees=${employees?.length || 0}, products=${products?.length || 0}`);
 
 /**
  * Auth qo'shilishidan oldin yaratilgan bazada parol hash'i bo'sh bo'ladi.
@@ -103,17 +121,33 @@ const PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
 const ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
 
-if (ADMIN_PASSWORD_FROM_ENV) {
+console.log("🔐 Admin initialization:");
+console.log("   Email from env:", process.env.ADMIN_EMAIL || "not set");
+console.log("   Password from env:", process.env.ADMIN_PASSWORD ? "***" : "not set");
+console.log("   Using Email:", ADMIN_EMAIL);
+console.log("   Using Password:", ADMIN_PASSWORD_FROM_ENV ? "***" : "empty");
+console.log("   Users array length:", users?.length || 0);
+
+try {
+  if (!ADMIN_PASSWORD_FROM_ENV) {
+    console.error("❌ CRITICAL: Admin password not configured!");
+    throw new Error("Admin password is required");
+  }
+
   // Admin foydalanuvchini topish (email yoki login bo'yicha)
   let adminUser = users.find(
     (u) => u.email === ADMIN_EMAIL || u.login === "admin" || u.role === "admin"
   );
 
+  console.log("🔍 Admin user search result:", adminUser ? "found" : "not found");
+
   if (!adminUser) {
     // Admin yo'q bo'lsa - yangi admin yaratish
+    console.log("📝 Creating new admin user...");
     const now = new Date();
+    const newAdminId = nextId();
     adminUser = {
-      id: nextId(),
+      id: newAdminId,
       name: "Administrator",
       login: "admin",
       email: ADMIN_EMAIL,
@@ -128,20 +162,50 @@ if (ADMIN_PASSWORD_FROM_ENV) {
     writeTable("users", users);
     console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
     console.info("🔑 Admin login ma'lumotlari:");
+    console.info(`   ID: ${newAdminId}`);
+    console.info(`   Login: admin`);
     console.info(`   Email: ${ADMIN_EMAIL}`);
     console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+    console.info(`   Password hash length: ${adminUser.passwordHash?.length || 0}`);
   } else {
     // Admin mavjud - parolni yangilash
+    console.log("♻️ Updating existing admin user...");
+    const oldHash = adminUser.passwordHash;
     adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
     adminUser.email = ADMIN_EMAIL;
+    adminUser.login = "admin";
     adminUser.role = "admin";
     adminUser.status = "active";
     writeTable("users", users);
     console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
     console.info("🔑 Admin login ma'lumotlari:");
+    console.info(`   ID: ${adminUser.id}`);
+    console.info(`   Login: ${adminUser.login}`);
     console.info(`   Email: ${ADMIN_EMAIL}`);
     console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+    console.info(`   Old hash length: ${oldHash?.length || 0}`);
+    console.info(`   New hash length: ${adminUser.passwordHash?.length || 0}`);
   }
+
+  // Final verification
+  const verifyAdmin = users.find(u => u.login === "admin" || u.email === ADMIN_EMAIL);
+  if (!verifyAdmin) {
+    console.error("❌ CRITICAL: Admin user not found after creation!");
+  } else {
+    console.log("✅ Admin user verification passed:", {
+      id: verifyAdmin.id,
+      login: verifyAdmin.login,
+      email: verifyAdmin.email,
+      hasPassword: !!verifyAdmin.passwordHash,
+      passwordHashLength: verifyAdmin.passwordHash?.length || 0,
+      status: verifyAdmin.status,
+      role: verifyAdmin.role
+    });
+  }
+} catch (adminError) {
+  console.error("❌ CRITICAL: Admin initialization failed!");
+  console.error("Error:", adminError);
+  throw adminError;
 }
 
 /**

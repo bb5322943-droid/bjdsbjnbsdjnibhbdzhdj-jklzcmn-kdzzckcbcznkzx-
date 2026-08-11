@@ -44,46 +44,105 @@ const changePasswordSchema = z.object({
 
 export const login: RequestHandler = (req, res) => {
   try {
+    // 1. Request body tekshirish
+    console.log("📨 Login request received");
+    console.log("📦 Request body:", req.body ? "exists" : "undefined/null");
+    console.log("🔍 Body type:", typeof req.body);
+    
+    if (!req.body || typeof req.body !== 'object') {
+      console.error("❌ Invalid request body:", req.body);
+      return res.status(400).json({ 
+        success: false, 
+        message: "Yaroqsiz so'rov: body bo'sh yoki noto'g'ri formatda" 
+      });
+    }
+
+    // 2. Validation
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      console.error("❌ Login validation error:", parsed.error);
+      console.error("❌ Login validation error:", parsed.error.errors);
       return sendValidationError(res, parsed.error);
     }
 
     const loginValue = parsed.data.login.trim().toLowerCase();
-    console.log("🔍 Login attempt:", { login: loginValue });
+    console.log("🔍 Login attempt for:", loginValue);
+    console.log("📊 Total users in database:", users?.length || 0);
     
-    // Email yoki login orqali qidirish
+    // 3. Users array tekshirish
+    if (!users || !Array.isArray(users)) {
+      console.error("❌ CRITICAL: users array undefined or not array!");
+      return res.status(500).json({
+        success: false,
+        message: "Server xatosi: Ma'lumotlar bazasi mavjud emas"
+      });
+    }
+
+    // 4. Email yoki login orqali qidirish
     const user = users.find(
-      (item) =>
-        (
-          (item.login && item.login.toLowerCase() === loginValue) ||
-          (item.email && item.email.toLowerCase() === loginValue)
-        ) &&
-        !item.deletedAt
+      (item) => {
+        try {
+          const loginMatch = item.login && item.login.toLowerCase() === loginValue;
+          const emailMatch = item.email && item.email.toLowerCase() === loginValue;
+          const notDeleted = !item.deletedAt;
+          return (loginMatch || emailMatch) && notDeleted;
+        } catch (findError) {
+          console.error("❌ Error in find predicate:", findError);
+          return false;
+        }
+      }
     );
 
     if (!user) {
       console.error("❌ User not found:", loginValue);
-      console.error("📋 Available users:", users.map(u => ({ login: u.login, email: u.email, hasPassword: !!u.passwordHash })));
-    }
-
-    // Parol tekshirish
-    const passwordValid = user ? verifyPassword(parsed.data.password, user.passwordHash) : false;
-    
-    if (!user || !passwordValid) {
-      console.error("❌ Auth failed:", { 
-        userFound: !!user, 
-        passwordValid,
-        userEmail: user?.email,
-        userLogin: user?.login,
-        hasPasswordHash: !!user?.passwordHash
+      console.error("📋 Available users:", users.slice(0, 5).map(u => ({ 
+        login: u.login, 
+        email: u.email, 
+        hasPassword: !!u.passwordHash 
+      })));
+      return res.status(401).json({ 
+        success: false, 
+        message: "Login yoki parol noto'g'ri" 
       });
-      return res
-        .status(401)
-        .json({ success: false, message: "Login yoki parol noto'g'ri" });
     }
 
+    console.log("✅ User found:", { 
+      id: user.id, 
+      login: user.login, 
+      email: user.email,
+      hasPassword: !!user.passwordHash,
+      status: user.status
+    });
+
+    // 5. Parol tekshirish
+    if (!user.passwordHash) {
+      console.error("❌ User has no password hash:", user.login);
+      return res.status(500).json({
+        success: false,
+        message: "Server xatosi: Parol hash mavjud emas"
+      });
+    }
+
+    let passwordValid = false;
+    try {
+      passwordValid = verifyPassword(parsed.data.password, user.passwordHash);
+      console.log("🔐 Password verification result:", passwordValid);
+    } catch (verifyError) {
+      console.error("❌ Password verification error:", verifyError);
+      return res.status(500).json({
+        success: false,
+        message: "Server xatosi: Parol tekshirishda xatolik"
+      });
+    }
+    
+    if (!passwordValid) {
+      console.error("❌ Invalid password for user:", user.login);
+      return res.status(401).json({ 
+        success: false, 
+        message: "Login yoki parol noto'g'ri" 
+      });
+    }
+
+    // 6. User status tekshirish
     if (user.status === "suspended") {
       console.warn("⚠️ User suspended:", user.email);
       return res.status(403).json({
@@ -92,30 +151,63 @@ export const login: RequestHandler = (req, res) => {
       });
     }
 
-    user.lastLogin = new Date().toISOString();
-    const token = createSession(user.id);
+    // 7. Session yaratish
+    let token: string;
+    try {
+      user.lastLogin = new Date().toISOString();
+      token = createSession(user.id);
+      console.log("✅ Session created:", { 
+        userId: user.id, 
+        tokenPrefix: token.substring(0, 10) + "..." 
+      });
+    } catch (sessionError) {
+      console.error("❌ Session creation error:", sessionError);
+      return res.status(500).json({
+        success: false,
+        message: "Server xatosi: Sessiya yaratishda xatolik"
+      });
+    }
 
-    console.log("✅ Login successful:", { user: user.email, token: token.substring(0, 10) + "..." });
+    // 8. Audit logging
+    try {
+      recordAudit({
+        user,
+        action: "login",
+        entity: "auth",
+        summary: `${user.name} tizimga kirdi`,
+        ip: clientIp(req),
+      });
+    } catch (auditError) {
+      // Audit xatosi login'ni to'xtatmasin
+      console.error("⚠️ Audit logging error (non-critical):", auditError);
+    }
 
-    recordAudit({
-      user,
-      action: "login",
-      entity: "auth",
-      summary: `${user.name} tizimga kirdi`,
-      ip: clientIp(req),
-    });
-
+    // 9. Success response
     const response: ApiResponse<LoginResponse> = {
       success: true,
       data: { token, user: toPublicUser(user) },
       message: "Tizimga muvaffaqiyatli kirdingiz",
     };
+    
+    console.log("✅ Login successful for:", user.email);
     res.json(response);
+    
   } catch (error) {
-    console.error("❌ LOGIN EXCEPTION:", error);
+    // 10. Global error handler
+    console.error("❌❌❌ LOGIN EXCEPTION (UNCAUGHT) ❌❌❌");
+    console.error("Error type:", error?.constructor?.name);
+    console.error("Error message:", error instanceof Error ? error.message : "Unknown");
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+    console.error("Request details:", {
+      body: req.body,
+      headers: req.headers,
+      url: req.url,
+      method: req.method
+    });
+    
     res.status(500).json({ 
       success: false, 
-      message: "Server xatosi: " + (error instanceof Error ? error.message : "Unknown error")
+      message: "Server xatosi: " + (error instanceof Error ? error.message : "Noma'lum xatolik")
     });
   }
 };

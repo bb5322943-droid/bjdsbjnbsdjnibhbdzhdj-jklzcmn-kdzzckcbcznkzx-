@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Orbis ERP - Deployment</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+        
+        .status {
+            background: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .status-text {
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-tertiary {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-tertiary:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4);
+        }
+        
+        .credentials {
+            background: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .credentials h3 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .cred-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .cred-label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .cred-value {
+            color: #111827;
+            font-weight: 700;
+            font-family: monospace;
+            font-size: 16px;
+        }
+        
+        .timer {
+            font-size: 48px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin: 20px 0;
+        }
+        
+        .info {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #92400e;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Orbis ERP Deployment</h1>
+        
+        <div class="status">
+            <div class="status-icon">✅</div>
+            <div class="status-text">Deploy qilindi! GitHub → Vercel</div>
+        </div>
+        
+        <div class="spinner"></div>
+        
+        <div class="timer" id="timer">⏱️ Build: <span id="countdown">180</span>s</div>
+        
+        <div class="info">
+            ⚠️ Deploy avtomatik ishlamoqda (GitHub push orqali)<br>
+            Build tugashi: 2-3 daqiqa
+        </div>
+        
+        <div class="credentials">
+            <h3>🔐 Login Ma'lumotlar</h3>
+            <div class="cred-item">
+                <span class="cred-label">Login:</span>
+                <span class="cred-value">admin</span>
+            </div>
+            <div class="cred-item">
+                <span class="cred-label">Parol:</span>
+                <span class="cred-value">OrbisAdmin2024!</span>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <a href="https://fusion-erp.vercel.app" target="_blank" class="btn btn-primary">
+                🌐 Production Saytni Ochish
+            </a>
+            
+            <a href="https://vercel.com/dashboard" target="_blank" class="btn btn-secondary">
+                📊 Vercel Dashboard
+            </a>
+            
+            <a href="https://github.com/bb5322943-droid" target="_blank" class="btn btn-tertiary">
+                📁 GitHub Repository
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Countdown timer
+        let seconds = 180;
+        const countdownEl = document.getElementById('countdown');
+        const timerEl = document.getElementById('timer');
+        
+        const interval = setInterval(() => {
+            seconds--;
+            countdownEl.textContent = seconds;
+            
+            if (seconds <= 0) {
+                clearInterval(interval);
+                timerEl.innerHTML = '✅ Build tugadi!';
+                timerEl.style.color = '#10b981';
+                
+                // Auto redirect to production
+                setTimeout(() => {
+                    window.open('https://fusion-erp.vercel.app', '_blank');
+                }, 1000);
+            }
+        }, 1000);
+        
+        // Auto open dashboard after 5 seconds
+        setTimeout(() => {
+            window.open('https://vercel.com/dashboard', '_blank');
+        }, 5000);
+    </script>
+</body>
+</html>
