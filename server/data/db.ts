@@ -17,9 +17,23 @@ if (USE_POSTGRES) {
   logger.info("Using SQLite database");
 }
 
-const DB_PATH = process.env.DATABASE_PATH
-  ? resolve(process.env.DATABASE_PATH)
-  : resolve(process.cwd(), "data", "orbis.db");
+// Vercel serverless environment check
+const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+
+const DB_PATH = (() => {
+  if (process.env.DATABASE_PATH) {
+    return resolve(process.env.DATABASE_PATH);
+  }
+  
+  // Vercel serverless - use /tmp directory (writable)
+  if (IS_VERCEL) {
+    logger.info("🔧 Vercel detected - using /tmp directory for SQLite");
+    return resolve('/tmp', 'orbis.db');
+  }
+  
+  // Local development - use data directory
+  return resolve(process.cwd(), "data", "orbis.db");
+})();
 
 let database: DatabaseSync | null = null;
 
@@ -35,18 +49,29 @@ export function db(): DatabaseSync {
 
   // SQLite file-based database
   try {
-    mkdirSync(dirname(DB_PATH), { recursive: true });
-    logger.info(`Database papkasi yaratildi: ${dirname(DB_PATH)}`);
+    const dbDir = dirname(DB_PATH);
+    mkdirSync(dbDir, { recursive: true });
+    logger.info(`📂 Database papkasi yaratildi: ${dbDir}`);
   } catch (error) {
-    logger.error("Database papkasini yaratishda xatolik:", error);
+    logger.error("❌ Database papkasini yaratishda xatolik:", error);
+    // On Vercel, /tmp should always be writable
+    if (IS_VERCEL) {
+      logger.error("🚨 CRITICAL: Cannot create /tmp directory on Vercel!");
+    }
   }
   
-  database = new DatabaseSync(DB_PATH);
-  database.exec("PRAGMA journal_mode = WAL");
-  database.exec("PRAGMA foreign_keys = ON");
-  
-  createSchema(database);
-  logger.info(`✅ SQLite database ishga tushdi: ${DB_PATH}`);
+  try {
+    database = new DatabaseSync(DB_PATH);
+    database.exec("PRAGMA journal_mode = WAL");
+    database.exec("PRAGMA foreign_keys = ON");
+    
+    createSchema(database);
+    logger.info(`✅ SQLite database ishga tushdi: ${DB_PATH}`);
+    logger.info(`📊 Database location: ${IS_VERCEL ? '/tmp (Vercel)' : 'local data/'}`);
+  } catch (error) {
+    logger.error("❌ CRITICAL: Database initialization failed:", error);
+    throw error;
+  }
 
   return database;
 }
