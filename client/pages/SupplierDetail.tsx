@@ -46,6 +46,8 @@ import {
   useSupplierFinancial,
   useSupplierKPI,
 } from "@/hooks/use-api";
+import { ProductReturnDialog } from "@/components/ProductReturnDialog";
+import { toast } from "sonner";
 
 /** Rating component */
 function Rating({ value }: { value: number }) {
@@ -105,6 +107,7 @@ export default function SupplierDetail() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
 
   // API hooks
   const { data: detailData, isLoading: detailLoading } = useSupplierDetail(id!);
@@ -125,6 +128,28 @@ export default function SupplierDetail() {
   const products = productsData?.data || [];
   const returns = returnsData?.data || [];
   const financial = financialData?.data || { summary: {}, history: [] };
+
+  const handleProductReturn = async (data: {
+    productId: string;
+    quantity: number;
+    reason: string;
+    note: string;
+  }) => {
+    try {
+      // TODO: Backend API call
+      // await returnProductToSupplier(id, data);
+      
+      toast.success("Mahsulot qaytarildi!", {
+        description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi`,
+      });
+      
+      setShowReturnDialog(false);
+    } catch (error) {
+      toast.error("Xatolik yuz berdi", {
+        description: "Mahsulotni qaytarishda muammo yuz berdi",
+      });
+    }
+  };
 
   if (detailLoading || kpiLoading) {
     return (
@@ -287,6 +312,19 @@ export default function SupplierDetail() {
           color="text-red-600"
         />
       </div>
+
+      {/* Action Buttons */}
+      {supplier?.status === "active" && products.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setShowReturnDialog(true)}
+            className="bg-[#cb8535] hover:bg-[#b87530]"
+          >
+            <PackageX size={16} className="mr-2" />
+            Mahsulotni qaytarish
+          </Button>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -593,6 +631,17 @@ export default function SupplierDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Product Return Dialog */}
+      {supplier && (
+        <ProductReturnDialog
+          open={showReturnDialog}
+          onOpenChange={setShowReturnDialog}
+          supplier={supplier}
+          products={products}
+          onSubmit={handleProductReturn}
+        />
+      )}
     </div>
   );
 }
