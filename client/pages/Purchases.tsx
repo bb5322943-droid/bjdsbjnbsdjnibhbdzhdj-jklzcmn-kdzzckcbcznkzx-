@@ -150,13 +150,11 @@ export default function Purchases() {
       await updatePurchase.mutateAsync({
         id: returning.id,
         status: "cancelled",
-        note: `Qaytarildi: ${returning.note || ""}`.trim(),
       });
-      toast.success(`${returning.purchaseNumber} qaytarildi`);
+      toast.success(`${returning.purchaseNumber} qaytarildi va bekor qilindi`);
       setReturning(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Xatolik yuz berdi");
-      throw err;
     }
   };
 
@@ -196,6 +194,7 @@ export default function Purchases() {
         </DropdownMenuItem>,
       );
     }
+    // Qabul qilingan mahsulotni qaytarish
     if (purchase.status === "received") {
       items.push(
         <DropdownMenuItem
@@ -649,11 +648,8 @@ export default function Purchases() {
         title="Tovarni qaytarish"
         description={
           <>
-            <b>{returning?.purchaseNumber}</b> qaytariladi. Mahsulotlar
-            ombor hisobidan chiqariladi va xarid bekor qilingan deb belgilanadi.
-            <br />
-            <br />
-            <b>Diqqat:</b> Bu amal ortga qaytarilmaydi!
+            <b>{returning?.purchaseNumber}</b> ta'minotchiga qaytariladi. Ombor
+            hisobidan tovar ayiriladi va xarid bekor qilinadi.
           </>
         }
         confirmText="Qaytarish"
