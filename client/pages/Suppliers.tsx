@@ -552,6 +552,22 @@ export default function Suppliers() {
               >
                 Qaytish
               </Button>
+              {viewing.status === "active" && products.filter(p => p.supplier === viewing.name && !p.deletedAt && p.quantity > 0).length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const supplier = viewing;
+                    setViewing(null);
+                    setReturningProduct(supplier);
+                  }}
+                  className="text-[#cb8535] hover:text-[#b87530]"
+                >
+                  <PackageX size={16} className="mr-2" />
+                  Mahsulotni qaytarish
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {
