@@ -721,7 +721,7 @@ export function useDeleteSupplier() {
 export function useSupplierDetail(id: string) {
   return useQuery({
     queryKey: ["suppliers", "detail", id],
-    queryFn: () => fetchApi<ApiResponse<{ supplier: Supplier; products: any[]; totalValue: number }>>(`/suppliers/${id}`),
+    queryFn: () => fetchApi<ApiResponse<{ supplier: Supplier; products: Product[]; totalValue: number }>>(`/suppliers/${id}`),
     enabled: !!id,
   });
 }
@@ -730,7 +730,7 @@ export function useSupplierDetail(id: string) {
 export function useSupplierPurchases(id: string) {
   return useQuery({
     queryKey: ["suppliers", "purchases", id],
-    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/purchases`),
+    queryFn: () => fetchApi<ApiResponse<import("@shared/api").SupplierPurchase[]>>(`/suppliers/${id}/purchases`),
     enabled: !!id,
   });
 }
@@ -739,7 +739,7 @@ export function useSupplierPurchases(id: string) {
 export function useSupplierProducts(id: string) {
   return useQuery({
     queryKey: ["suppliers", "products", id],
-    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/products`),
+    queryFn: () => fetchApi<ApiResponse<import("@shared/api").SupplierProduct[]>>(`/suppliers/${id}/products`),
     enabled: !!id,
   });
 }
@@ -748,7 +748,7 @@ export function useSupplierProducts(id: string) {
 export function useSupplierReturns(id: string) {
   return useQuery({
     queryKey: ["suppliers", "returns", id],
-    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/returns`),
+    queryFn: () => fetchApi<ApiResponse<import("@shared/api").SupplierReturn[]>>(`/suppliers/${id}/returns`),
     enabled: !!id,
   });
 }
@@ -757,7 +757,7 @@ export function useSupplierReturns(id: string) {
 export function useSupplierFinancial(id: string) {
   return useQuery({
     queryKey: ["suppliers", "financial", id],
-    queryFn: () => fetchApi<ApiResponse<{ summary: any; history: any[] }>>(`/suppliers/${id}/financial`),
+    queryFn: () => fetchApi<ApiResponse<import("@shared/api").SupplierFinancial>>(`/suppliers/${id}/financial`),
     enabled: !!id,
   });
 }
@@ -768,6 +768,29 @@ export function useSupplierKPI(id: string) {
     queryKey: ["suppliers", "kpi", id],
     queryFn: () => fetchApi<ApiResponse<{ totalPurchases: number; ordersCount: number; avgRating: number; returnsCount: number }>>(`/suppliers/${id}/stats`),
     enabled: !!id,
+  });
+}
+
+/** Ta'minotchiga mahsulot qaytarish */
+export function useReturnProductToSupplier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { 
+      id: string; 
+      productId: string; 
+      quantity: number; 
+      reason: import("@shared/api").ReturnProductRequest["reason"]; 
+      note: string 
+    }) =>
+      fetchApi<ApiResponse<import("@shared/api").SupplierReturn>>(`/suppliers/${id}/return`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
   });
 }
 
@@ -1002,7 +1025,6 @@ export function useMarkAttendance() {
         body: JSON.stringify(data),
       }),
     onSuccess: (data) => {
-      console.log("Davomat muvaffaqiyatli saqlandi:", data);
       // Barcha davomat querylarini kuchli yangilash
       queryClient.invalidateQueries({ queryKey: ["hr", "attendance"], refetchType: 'all' });
       // Qo'shimcha: to'g'ridan-to'g'ri refetch
@@ -1442,7 +1464,7 @@ export function useSales(params: SalesFilters = {}, options?: QueryOptions) {
 export function useCreateSale() {
   const invalidate = useInvalidateSales();
   return useMutation({
-    mutationFn: (data: any) =>
+    mutationFn: (data: import("@shared/api").CreateSaleData) =>
       fetchApi<ApiResponse<import("@shared/api").Sale>>("/sales", {
         method: "POST",
         body: JSON.stringify(data),
@@ -1454,8 +1476,8 @@ export function useCreateSale() {
 export function useRefundSale() {
   const invalidate = useInvalidateSales();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; items: any[]; refundReason: string; paymentMethod: string }) =>
-      fetchApi<ApiResponse<import("@shared/api").Refund>>(`/sales/${id}/refund`, {
+    mutationFn: (data: import("@shared/api").RefundSaleData) =>
+      fetchApi<ApiResponse<import("@shared/api").Refund>>(`/sales/${data.id}/refund`, {
         method: "POST",
         body: JSON.stringify(data),
       }),

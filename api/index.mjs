@@ -2271,7 +2271,7 @@ var customers$1 = readTable("customers");
 var suppliers$1 = readTable("suppliers");
 var branches = readTable("branches");
 var orders$1 = readTable("orders");
-var purchases$2 = readTable("purchases");
+var purchases$1 = readTable("purchases");
 var invoices = readTable("invoices");
 var attendance = readTable("attendance");
 var leaveRequests = readTable("leave_requests");
@@ -2391,7 +2391,7 @@ function persist() {
 	writeTable("suppliers", suppliers$1);
 	writeTable("branches", branches);
 	writeTable("orders", orders$1);
-	writeTable("purchases", purchases$2);
+	writeTable("purchases", purchases$1);
 	writeTable("invoices", invoices);
 	writeTable("attendance", attendance);
 	writeTable("leave_requests", leaveRequests);
@@ -2484,7 +2484,7 @@ var employees = () => active(employees$1);
 var orders = () => active(orders$1);
 var payrolls = () => active(payrolls$1);
 var products = () => active(products$1);
-var purchases$1 = () => active(purchases$2);
+var purchases = () => active(purchases$1);
 var suppliers = () => active(suppliers$1);
 var transactions = () => active(transactions$1);
 var users = () => active(users$1);
@@ -2883,11 +2883,11 @@ function supplierStats() {
 	};
 }
 function purchaseStats() {
-	const billable = purchases$1().filter((p) => p.status !== "cancelled");
+	const billable = purchases().filter((p) => p.status !== "cancelled");
 	return {
-		totalPurchases: purchases$1().length,
-		awaitingDelivery: purchases$1().filter((p) => p.status === "ordered").length,
-		receivedThisMonth: purchases$1().filter((p) => p.status === "received" && inPeriod(p.orderDate, currentPeriod$1())).length,
+		totalPurchases: purchases().length,
+		awaitingDelivery: purchases().filter((p) => p.status === "ordered").length,
+		receivedThisMonth: purchases().filter((p) => p.status === "received" && inPeriod(p.orderDate, currentPeriod$1())).length,
 		totalValue: billable.reduce((sum, p) => sum + p.total, 0),
 		unpaidAmount: billable.reduce((sum, p) => {
 			if (p.paymentStatus === "paid") return sum;
@@ -3072,7 +3072,7 @@ function reportSummary(from, to) {
 		margin: totalIncome === 0 ? 0 : Math.round(netProfit / totalIncome * 1e3) / 10,
 		ordersCount: periodOrders.length,
 		ordersValue: periodOrders.reduce((sum, o) => sum + o.total, 0),
-		purchasesValue: purchases$1().filter((p) => p.status !== "cancelled" && inRange(p.orderDate)).reduce((sum, p) => sum + p.total, 0),
+		purchasesValue: purchases().filter((p) => p.status !== "cancelled" && inRange(p.orderDate)).reduce((sum, p) => sum + p.total, 0),
 		newCustomers: customers().filter((c) => inRange(c.createdDate)).length,
 		byCategory,
 		monthly,
@@ -4042,7 +4042,7 @@ var deleteSupplier = (req, res) => {
 var getSupplierPurchases = (req, res) => {
 	const supplier = suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt);
 	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
-	const purchasesWithDetails = active(purchases).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name).map((purchase) => ({
+	const purchasesWithDetails = active(purchases$1).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name).map((purchase) => ({
 		...purchase,
 		products: purchase.items
 	}));
@@ -4077,7 +4077,7 @@ var getSupplierReturns = (req, res) => {
 var getSupplierFinancial = (req, res) => {
 	const supplier = suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt);
 	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
-	const supplierPurchases = active(purchases).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name);
+	const supplierPurchases = active(purchases$1).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name);
 	let totalPurchases = 0;
 	let totalPaid = 0;
 	const financialHistory = [];
@@ -4133,7 +4133,7 @@ var getSupplierKPI = (req, res) => {
 	const supplierId = req.params.id;
 	const supplier = suppliers$1.find((s) => s.id === supplierId && !s.deletedAt);
 	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
-	const supplierPurchases = active(purchases).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name);
+	const supplierPurchases = active(purchases$1).filter((p) => p.supplierId === supplier.id || p.supplierName === supplier.name);
 	const totalPurchases = supplierPurchases.reduce((sum, p) => sum + p.total, 0);
 	const ordersCount = supplierPurchases.length;
 	res.json({
@@ -4144,6 +4144,55 @@ var getSupplierKPI = (req, res) => {
 			avgRating: supplier.rating,
 			returnsCount: 0
 		}
+	});
+};
+/** Ta'minotchiga mahsulot qaytarish */
+var returnProductSchema = z.object({
+	productId: z.string().min(1, "Mahsulot ID kiritilishi shart"),
+	quantity: z.coerce.number().min(1, "Miqdor kamida 1 bo'lishi kerak"),
+	reason: z.enum([
+		"defective",
+		"wrong_item",
+		"damaged",
+		"quality",
+		"expired",
+		"other"
+	]),
+	note: z.string().trim().catch("")
+});
+var returnProductToSupplier = (req, res) => {
+	const supplierId = req.params.id;
+	const supplier = suppliers$1.find((s) => s.id === supplierId && !s.deletedAt);
+	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+	const parsed = returnProductSchema.safeParse(req.body);
+	if (!parsed.success) return sendValidationError(res, parsed.error);
+	const { productId, quantity, reason, note } = parsed.data;
+	const product = products$1.find((p) => p.id === productId && !p.deletedAt);
+	if (!product) return sendNotFound(res, "Mahsulot topilmadi");
+	if (product.quantity < quantity) return res.status(400).json({
+		success: false,
+		message: `Omborda faqat ${product.quantity} ta mahsulot mavjud`
+	});
+	const returnRecord = {
+		id: nextId(),
+		supplierId,
+		supplierName: supplier.name,
+		productId,
+		productName: product.name,
+		quantity,
+		reason,
+		reasonText: note,
+		amount: product.price * quantity,
+		status: "pending",
+		returnDate: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+		purchaseNumber: "AUTO",
+		createdAt: (/* @__PURE__ */ new Date()).toISOString()
+	};
+	product.quantity -= quantity;
+	res.json({
+		success: true,
+		data: returnRecord,
+		message: "Mahsulot muvaffaqiyatli qaytarildi"
 	});
 };
 //#endregion
@@ -4581,7 +4630,7 @@ var querySchema$4 = paginationSchema.extend({
 	supplierId: z.string().optional()
 });
 function nextPurchaseNumber() {
-	return `PO-${purchases$2.reduce((highest, purchase) => {
+	return `PO-${purchases$1.reduce((highest, purchase) => {
 		const parsed = Number(purchase.purchaseNumber.replace(/\D/g, ""));
 		return Number.isFinite(parsed) && parsed > highest ? parsed : highest;
 	}, 2e3) + 1}`;
@@ -4655,7 +4704,7 @@ var getPurchaseStats = (_req, res) => {
 var getPurchases = (req, res) => {
 	const query = querySchema$4.parse(req.query);
 	const search = query.search.toLowerCase();
-	const filtered = active(purchases$2).filter((p) => {
+	const filtered = active(purchases$1).filter((p) => {
 		if (search && !p.purchaseNumber.toLowerCase().includes(search) && !p.supplierName.toLowerCase().includes(search) && !p.createdBy.toLowerCase().includes(search) && !p.items.some((item) => item.productName.toLowerCase().includes(search))) return false;
 		if (query.status && p.status !== query.status) return false;
 		if (query.paymentStatus && p.paymentStatus !== query.paymentStatus) return false;
@@ -4688,7 +4737,7 @@ var createPurchase = (req, res) => {
 		createdBy: parsed.data.createdBy,
 		note: parsed.data.note
 	};
-	purchases$2.unshift(newPurchase);
+	purchases$1.unshift(newPurchase);
 	if (newPurchase.status === "received") receiveStock(newPurchase);
 	if (newPurchase.paymentStatus === "paid") recordExpense(newPurchase);
 	logActivity({
@@ -4706,7 +4755,7 @@ var createPurchase = (req, res) => {
 var updatePurchase = (req, res) => {
 	const parsed = purchaseSchema.partial().safeParse(req.body);
 	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const purchase = purchases$2.find((p) => p.id === req.params.id && !p.deletedAt);
+	const purchase = purchases$1.find((p) => p.id === req.params.id && !p.deletedAt);
 	if (!purchase) return sendNotFound(res, "Xarid buyurtmasi topilmadi");
 	const wasReceived = purchase.status === "received";
 	const previousPayment = purchase.paymentStatus;
@@ -4750,10 +4799,10 @@ var updatePurchase = (req, res) => {
 	res.json(response);
 };
 var deletePurchase = (req, res) => {
-	const purchase = purchases$2.find((p) => p.id === req.params.id && !p.deletedAt);
+	const purchase = purchases$1.find((p) => p.id === req.params.id && !p.deletedAt);
 	if (!purchase) return sendNotFound(res, "Xarid buyurtmasi topilmadi");
 	if (purchase.status === "received") reverseStock(purchase);
-	softRemove(purchases$2, purchase.id);
+	softRemove(purchases$1, purchase.id);
 	logActivity({
 		action: "Xarid buyurtmasi o'chirildi",
 		details: `${purchase.purchaseNumber} · ${purchase.supplierName}`,
@@ -6693,6 +6742,7 @@ function createServer() {
 	app.get("/api/suppliers/:id/financial", getSupplierFinancial);
 	app.get("/api/suppliers/:id/stats", getSupplierKPI);
 	app.post("/api/suppliers", createSupplier);
+	app.post("/api/suppliers/:id/return", returnProductToSupplier);
 	app.put("/api/suppliers/:id", updateSupplier);
 	app.patch("/api/suppliers/:id/restore", restoreSupplier);
 	app.delete("/api/suppliers/:id", deleteSupplier);

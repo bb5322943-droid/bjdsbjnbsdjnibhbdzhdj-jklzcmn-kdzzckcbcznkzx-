@@ -72,6 +72,7 @@ import {
   getSuppliersWithProducts,
   restoreSupplier,
   updateSupplier,
+  returnProductToSupplier,
 } from "./routes/suppliers";
 import {
   createBranch,
@@ -539,6 +540,7 @@ export function createServer() {
   app.get("/api/suppliers/:id/financial", getSupplierFinancial);
   app.get("/api/suppliers/:id/stats", getSupplierKPI);
   app.post("/api/suppliers", createSupplier);
+  app.post("/api/suppliers/:id/return", returnProductToSupplier);
   app.put("/api/suppliers/:id", updateSupplier);
   app.patch("/api/suppliers/:id/restore", restoreSupplier);
   app.delete("/api/suppliers/:id", deleteSupplier);

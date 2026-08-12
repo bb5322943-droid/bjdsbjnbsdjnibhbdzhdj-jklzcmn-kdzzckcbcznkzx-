@@ -229,7 +229,7 @@ export default function POS() {
     }
   };
 
-  const printReceipt = (sale: { saleNumber: string; items: any[]; subtotal: number; discount: number; tax: number; total: number; paymentMethod: string; sellerName: string; branchName: string }, paidAmount: number, debtAmount: number) => {
+  const printReceipt = (sale: import("@shared/api").ReceiptData, paidAmount: number, debtAmount: number) => {
     const w = window.open("", "_blank", "width=320,height=600");
     if (!w) { toast.error("Chek oynasini ochib bo'lmadi!"); return; }
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Chek</title>
@@ -244,7 +244,7 @@ export default function POS() {
 <div class="row"><span>Sana:</span><span>${new Date().toLocaleString("uz-UZ")}</span></div>
 <div class="row"><span>Kassir:</span><span>${sale.sellerName}</span></div>
 <div class="dashed"></div>
-${sale.items.map((item: any, i: number) => `<div class="bold">${i + 1}. ${item.productName}</div>
+${sale.items.map((item: import("@shared/api").ReceiptItem, i: number) => `<div class="bold">${i + 1}. ${item.productName}</div>
 <div class="row" style="margin-left:10px"><span>${item.quantity} × ${formatCurrency(item.unitPrice)}</span><span>${formatCurrency(item.total)}</span></div>`).join("")}
 <div class="dashed"></div>
 <div class="row"><span>Oraliq:</span><span>${formatCurrency(sale.subtotal)}</span></div>

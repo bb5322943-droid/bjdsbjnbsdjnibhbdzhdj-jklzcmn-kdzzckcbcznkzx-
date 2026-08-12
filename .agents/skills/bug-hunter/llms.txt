@@ -1,0 +1,69 @@
+# Bug Hunter
+
+Bug Hunter is an adversarial code-audit skill for AI coding agents. The default
+run scans and reports without editing files.
+
+## Start
+
+Install and verify for the intended agent:
+
+```bash
+npx --yes https://github.com/codexstar69/bug-hunter/archive/refs/heads/main.tar.gz install --agent codex
+npx --yes https://github.com/codexstar69/bug-hunter/archive/refs/heads/main.tar.gz doctor --agent codex
+```
+
+Then ask the coding agent:
+
+```text
+Use the bug-hunter skill to scan this repository. Do not edit files.
+Return the final report and call out every item that needs manual review.
+```
+
+The `bug-hunter` terminal command installs and verifies the skill. Scans are
+requested inside the coding agent. There is no `bug-hunter scan` shell command.
+
+## Safety
+
+- No flags means scan-only.
+- `--plan` builds a remediation plan without edits.
+- `--fix --approve` requests the host's reviewed/default permission mode.
+- `--preview` builds strategy and fix-plan output without source edits.
+- `--autonomous` explicitly permits unattended edits.
+- `--auto-commit` separately grants commit permission for the approved plan.
+- Referee or preservation failure disables fixing for the affected scope.
+
+## Pipeline
+
+Triage -> Recon -> Hunter -> documentation checks -> Skeptic -> Referee ->
+report -> optional plan -> optional approved Fixer -> verification
+
+Only the Referee can confirm findings. Invalid or incomplete review is reported
+as `manual-review` or `unreviewed`, never as clean.
+
+## Common agent arguments
+
+```text
+/bug-hunter
+/bug-hunter src/auth
+/bug-hunter --staged
+/bug-hunter --pr
+/bug-hunter --pr-security
+/bug-hunter --deps --threat-model
+/bug-hunter --plan
+/bug-hunter --fix --approve
+```
+
+Dependency parsing and reachability support JavaScript and TypeScript projects
+using npm, pnpm, Yarn, or Bun lockfiles. Other ecosystems return
+`scanner-unsupported`.
+
+## Read next
+
+- `README.md`: product overview and start path
+- `docs/getting-started.md`: complete first run
+- `docs/agent-installation.md`: targets, update, custom paths
+- `docs/usage-guide.md`: portable prompts and workflows
+- `docs/cli-reference.md`: installer commands and skill arguments
+- `docs/how-it-works.md`: roles, trust boundaries, outputs
+- `docs/troubleshooting.md`: failure recovery
+- `SKILL.md`: canonical orchestration contract

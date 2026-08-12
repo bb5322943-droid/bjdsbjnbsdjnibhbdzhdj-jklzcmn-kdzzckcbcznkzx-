@@ -1059,3 +1059,113 @@ export interface PaginatedResponse<T> {
     pages: number;
   };
 }
+
+// Supplier Detail Page Types
+export interface SupplierPurchase {
+  id: string;
+  purchaseNumber: string;
+  orderDate: string;
+  items: PurchaseItem[];
+  total: number;
+  paymentStatus: PaymentStatus;
+  status: PurchaseStatus;
+}
+
+export interface SupplierProduct {
+  id: string;
+  name: string;
+  sku?: string;
+  category: string;
+  quantity: number;
+  price: number;
+  lastDeliveryDate?: string;
+}
+
+export interface SupplierReturn {
+  id: string;
+  returnDate: string;
+  purchaseNumber: string;
+  productName: string;
+  quantity: number;
+  reason: 'defective' | 'wrong_item' | 'damaged' | 'quality' | 'expired' | 'other';
+  reasonText: string;
+  amount: number;
+  status: 'approved' | 'pending' | 'rejected';
+}
+
+export interface SupplierFinancial {
+  summary: {
+    totalPaid: number;
+    currentDebt: number;
+    lastPaymentDate?: string;
+  };
+  history: FinancialRecord[];
+}
+
+export interface FinancialRecord {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'payment' | 'purchase';
+  balance: number;
+}
+
+export interface SupplierKPI {
+  totalPurchases: number;
+  ordersCount: number;
+  avgRating: number;
+  returnsCount: number;
+}
+
+export interface ReturnProductRequest {
+  productId: string;
+  quantity: number;
+  reason: SupplierReturn['reason'];
+  note: string;
+}
+
+// Receipt Types
+export interface ReceiptItem {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface ReceiptData {
+  saleNumber: string;
+  items: ReceiptItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paymentMethod: string;
+  sellerName: string;
+  branchName: string;
+}
+
+// Sales & Refund Types
+export interface CreateSaleData {
+  items: SaleItem[];
+  discount: number;
+  tax: number;
+  paymentMethod: Sale['paymentMethod'];
+  customerId?: string;
+  note?: string;
+}
+
+export interface RefundItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface RefundSaleData {
+  id: string;
+  items: RefundItem[];
+  refundReason: string;
+  paymentMethod: Refund['paymentMethod'];
+}

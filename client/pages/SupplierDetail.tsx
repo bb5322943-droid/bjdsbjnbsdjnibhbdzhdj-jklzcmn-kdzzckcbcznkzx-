@@ -15,11 +15,12 @@ import {
   Filter,
   Search,
   Loader2,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -45,7 +46,15 @@ import {
   useSupplierReturns,
   useSupplierFinancial,
   useSupplierKPI,
+  useReturnProductToSupplier,
 } from "@/hooks/use-api";
+import type {
+  SupplierPurchase,
+  SupplierProduct,
+  SupplierReturn,
+  FinancialRecord,
+  PurchaseItem,
+} from "@shared/api";
 import { ProductReturnDialog } from "@/components/ProductReturnDialog";
 import { toast } from "sonner";
 
@@ -74,7 +83,7 @@ function StatCard({
   subtitle,
   color = "text-[#173f38]",
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   subtitle?: string;
@@ -117,6 +126,8 @@ export default function SupplierDetail() {
   const { data: returnsData, isLoading: returnsLoading } = useSupplierReturns(id!);
   const { data: financialData, isLoading: financialLoading } = useSupplierFinancial(id!);
 
+  const returnMutation = useReturnProductToSupplier();
+
   const supplier = detailData?.data?.supplier;
   const stats = kpiData?.data || {
     totalPurchases: 0,
@@ -127,17 +138,16 @@ export default function SupplierDetail() {
   const purchases = purchasesData?.data || [];
   const products = productsData?.data || [];
   const returns = returnsData?.data || [];
-  const financial = financialData?.data || { summary: {}, history: [] };
+  const financial = financialData?.data || { summary: { totalPaid: 0, currentDebt: 0 }, history: [] };
 
   const handleProductReturn = async (data: {
     productId: string;
     quantity: number;
-    reason: string;
+    reason: import("@shared/api").ReturnProductRequest["reason"];
     note: string;
   }) => {
     try {
-      // TODO: Backend API call
-      // await returnProductToSupplier(id, data);
+      await returnMutation.mutateAsync({ id: id!, ...data });
       
       toast.success("Mahsulot qaytarildi!", {
         description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi`,
@@ -146,10 +156,53 @@ export default function SupplierDetail() {
       setShowReturnDialog(false);
     } catch (error) {
       toast.error("Xatolik yuz berdi", {
-        description: "Mahsulotni qaytarishda muammo yuz berdi",
+        description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
       });
     }
   };
+
+  // Filter functions
+  const filteredPurchases = purchases.filter((purchase) => {
+    // Search filter
+    const matchesSearch = !searchQuery || 
+      purchase.purchaseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      purchase.items?.some((item: PurchaseItem) => 
+        item.productName.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== "all") {
+      const purchaseDate = new Date(purchase.orderDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (dateFilter === "today") {
+        purchaseDate.setHours(0, 0, 0, 0);
+        matchesDate = purchaseDate.getTime() === today.getTime();
+      } else if (dateFilter === "week") {
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
+        matchesDate = purchaseDate >= weekAgo;
+      } else if (dateFilter === "month") {
+        matchesDate = purchaseDate.getMonth() === today.getMonth() &&
+                     purchaseDate.getFullYear() === today.getFullYear();
+      }
+    }
+    
+    return matchesSearch && matchesDate;
+  });
+
+  const filteredProducts = products.filter((product) => {
+    return !searchQuery || 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const filteredReturns = returns.filter((returnItem) => {
+    return statusFilter === "all" || returnItem.status === statusFilter;
+  });
 
   if (detailLoading || kpiLoading) {
     return (
@@ -178,7 +231,7 @@ export default function SupplierDetail() {
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: any; text: string }> = {
+    const variants: Record<string, { variant: BadgeProps["variant"]; text: string }> = {
       active: { variant: "default", text: "Faol" },
       inactive: { variant: "secondary", text: "Arxivda" },
       paid: { variant: "default", text: "To'langan" },
@@ -190,7 +243,7 @@ export default function SupplierDetail() {
       approved: { variant: "default", text: "Tasdiqlandi" },
     };
 
-    const config = variants[status] || { variant: "secondary", text: status };
+    const config = variants[status] || { variant: "secondary" as const, text: status };
     return <Badge variant={config.variant}>{config.text}</Badge>;
   };
 
@@ -382,8 +435,8 @@ export default function SupplierDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchases.map((purchase: any) => {
-                    const totalQty = purchase.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+                  {filteredPurchases.map((purchase: SupplierPurchase) => {
+                    const totalQty = purchase.items?.reduce((sum: number, item: PurchaseItem) => sum + item.quantity, 0) || 0;
                     
                     return (
                       <TableRow key={purchase.id}>
@@ -393,9 +446,9 @@ export default function SupplierDetail() {
                         <TableCell>{purchase.orderDate}</TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            {purchase.items?.map((item: any, idx: number) => (
+                            {purchase.items?.map((item: PurchaseItem, idx: number) => (
                               <div key={idx} className="text-sm">
-                                {item.name} ({item.quantity} ta)
+                                {item.productName} ({item.quantity} ta)
                               </div>
                             ))}
                           </div>
@@ -451,7 +504,7 @@ export default function SupplierDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {products.map((product: any) => (
+                  {filteredProducts.map((product: SupplierProduct) => (
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">
                         {product.name}
@@ -509,14 +562,14 @@ export default function SupplierDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {returns.length === 0 ? (
+                  {filteredReturns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Qaytarilgan mahsulotlar yo'q
                       </TableCell>
                     </TableRow>
                   ) : (
-                    returns.map((returnItem: any) => (
+                    filteredReturns.map((returnItem: SupplierReturn) => (
                       <TableRow key={returnItem.id}>
                         <TableCell>{returnItem.returnDate}</TableCell>
                         <TableCell className="font-medium">
@@ -605,7 +658,7 @@ export default function SupplierDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {financial.history?.map((item: any) => (
+                  {financial.history?.map((item: FinancialRecord) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.date}</TableCell>
                       <TableCell>{item.description}</TableCell>

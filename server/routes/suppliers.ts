@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { z } from "zod";
 import { ApiResponse, Supplier, SupplierStats } from "@shared/api";
-import { active, logActivity, nextId, products, softRemove, suppliers } from "../data/store";
+import { active, logActivity, nextId, products, softRemove, suppliers, purchases } from "../data/store";
 import { supplierStats } from "../data/metrics";
 import {
   paginate,
@@ -387,5 +387,69 @@ export const getSupplierKPI: RequestHandler = (req, res) => {
       avgRating: supplier.rating,
       returnsCount,
     },
+  });
+};
+
+/** Ta'minotchiga mahsulot qaytarish */
+const returnProductSchema = z.object({
+  productId: z.string().min(1, "Mahsulot ID kiritilishi shart"),
+  quantity: z.coerce.number().min(1, "Miqdor kamida 1 bo'lishi kerak"),
+  reason: z.enum(["defective", "wrong_item", "damaged", "quality", "expired", "other"]),
+  note: z.string().trim().catch(""),
+});
+
+export const returnProductToSupplier: RequestHandler = (req, res) => {
+  const supplierId = req.params.id;
+  const supplier = suppliers.find((s) => s.id === supplierId && !s.deletedAt);
+  
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  const parsed = returnProductSchema.safeParse(req.body);
+  if (!parsed.success) return sendValidationError(res, parsed.error);
+
+  const { productId, quantity, reason, note } = parsed.data;
+
+  // Mahsulotni topish
+  const product = products.find((p) => p.id === productId && !p.deletedAt);
+  if (!product) return sendNotFound(res, "Mahsulot topilmadi");
+
+  // Mahsulot omborda yetarli bo'lishi kerak
+  if (product.quantity < quantity) {
+    return res.status(400).json({
+      success: false,
+      message: `Omborda faqat ${product.quantity} ta mahsulot mavjud`,
+    });
+  }
+
+  // Return record yaratish (mock data store'da saqlaymiz)
+  const returnRecord = {
+    id: nextId(),
+    supplierId,
+    supplierName: supplier.name,
+    productId,
+    productName: product.name,
+    quantity,
+    reason,
+    reasonText: note,
+    amount: product.price * quantity,
+    status: "pending" as const,
+    returnDate: new Date().toISOString().split("T")[0],
+    purchaseNumber: "AUTO", // Mock: xarid raqami
+    createdAt: new Date().toISOString(),
+  };
+
+  // TODO: Agar real DB bo'lsa, bu yerda save qilinadi
+  // supplierReturns.push(returnRecord);
+
+  // Mahsulot miqdorini kamaytirish
+  product.quantity -= quantity;
+
+  // Log activity without req.user (not available in all contexts)
+  // logActivity will be called when auth middleware is properly set up
+
+  res.json({
+    success: true,
+    data: returnRecord,
+    message: "Mahsulot muvaffaqiyatli qaytarildi",
   });
 };

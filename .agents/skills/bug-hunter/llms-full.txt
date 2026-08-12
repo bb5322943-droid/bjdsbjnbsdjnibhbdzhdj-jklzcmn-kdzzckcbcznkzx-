@@ -1,0 +1,151 @@
+# Bug Hunter agent reference
+
+## Purpose
+
+Bug Hunter is a file-based skill for AI coding agents. It audits code through
+adversarial review:
+
+1. Triage classifies file risk.
+2. Recon maps architecture and trust boundaries.
+3. Hunter records evidence-backed bug claims.
+4. Documentation lookup checks version-sensitive behavior.
+5. Skeptic tries to disprove each claim.
+6. Referee issues final verdicts.
+7. The pipeline writes canonical JSON and a human-readable report.
+8. Fix planning and fixing run only when explicitly requested.
+
+## Interface boundary
+
+Terminal CLI:
+
+```text
+bug-hunter install [--agent <name>] [--path <dir>] [--skip-doctor]
+bug-hunter doctor [--agent <name>] [--path <dir>]
+bug-hunter info
+bug-hunter --version
+bug-hunter --help
+```
+
+The terminal CLI does not scan repositories.
+
+Agent request:
+
+```text
+Use the bug-hunter skill to scan this repository. Do not edit files.
+```
+
+Optional slash form:
+
+```text
+/bug-hunter
+```
+
+## Install targets
+
+| Agent | Target |
+|---|---|
+| Claude Code | `claude-code` |
+| Codex | `codex` |
+| Generic skills | `agents` |
+| Cursor | `cursor` |
+| Kiro | `kiro` |
+| GitHub Copilot | `copilot` |
+| Windsurf | `windsurf` |
+| OpenCode | `opencode` |
+
+Use an explicit target. Verify with `doctor --agent <target>`.
+
+## Skill arguments
+
+| Argument | Behavior |
+|---|---|
+| no arguments | Scan current repository without edits |
+| `<path>` | Scan one path |
+| `-b <branch>` | Scan a branch diff |
+| `--base <branch>` | Select branch-diff base |
+| `--staged` | Review staged files |
+| `--pr [current\|recent\|N]` | Review a pull request |
+| `--pr-security` | Pull-request security workflow |
+| `--scan-only`, `--review` | Request report-only behavior; do not combine with mutation flags |
+| `--plan-only`, `--plan` | Build strategy and plan, then stop |
+| `--fix` | Permit reviewed fixes |
+| `--approve` | Request the host's reviewed/default permission mode |
+| `--safe` | Alias for `--fix --approve` |
+| `--dry-run`, `--preview` | Build strategy and plan without source edits |
+| `--autonomous` | Permit unattended fixing |
+| `--auto-commit` | Grant commit permission during authorized fixing |
+| `--loop` | Continue until queued coverage is complete |
+| `--deps` | Audit supported Node.js dependencies |
+| `--threat-model` | Generate or load a STRIDE threat model |
+| `--security-review` | Full bundled security workflow |
+| `--validate-security` | Force security-finding validation |
+
+Internal script options such as `--worker-cmd`, `--max-iterations`, and
+`--confidence-threshold` are not top-level skill arguments.
+
+## Safety contract
+
+- Scan-only is the default.
+- Only Referee-confirmed bug IDs can enter a fix plan.
+- Fixer scope binds repository root, base commit, bug IDs, and file paths.
+- Claimed line ranges remain review context in the fix plan.
+- Referee timeout or invalid output marks findings unreviewed and disables
+  fixing for them.
+- Git safety failure stops Phase 2.
+- Requested worktree isolation never falls back to direct edits.
+- Cleanup preserves a worktree when safe removal cannot be proven.
+- Commit permission is independent from edit permission.
+
+## Output contract
+
+Canonical files under `.bug-hunter/`:
+
+| File | Meaning |
+|---|---|
+| `triage.json` | Risk classification |
+| `recon.json` | Stack and attack surface |
+| `hunter-findings.json` | Hunter claims |
+| `skeptic.json` | Challenges |
+| `referee.json` | Final verdicts |
+| `scan-report.json` | Joined final result |
+| `coverage.json` | Coverage state |
+| `fix-strategy.json` | Remediation classes |
+| `fix-plan.json` | Authorized fix stages |
+| `fixer-scope.json` | Mutation boundary |
+| `fix-report.json` | Patch and check results |
+| `report.md` | Human-readable final report |
+
+JSON files are canonical. Markdown files are rendered views.
+
+## Result rules
+
+- `confirmed`: Referee accepted the finding.
+- `dismissed`: evidence disproved the finding.
+- `manual-review`: automatic remediation is not authorized.
+- `unreviewed`: adversarial review did not complete.
+- `scanner-unsupported`: the requested dependency scanner is not implemented
+  for the ecosystem.
+
+Do not report a clean result when manual-review or unreviewed items remain.
+
+## Language and dependency scope
+
+Agent source analysis supports common JavaScript, TypeScript, Python, Go, Rust,
+Java, Kotlin, Ruby, PHP, C#, Swift, C, and C++ repositories.
+
+Bundled dependency parsing and reachability support JavaScript and TypeScript
+projects using npm, pnpm, Yarn, or Bun lockfiles. Python, Go, and Rust
+dependency ecosystems return `scanner-unsupported`.
+
+## Canonical references
+
+- `SKILL.md`: parser and orchestration contract
+- `modes/dispatch.md`: delegated backend contract
+- `modes/fix-pipeline.md`: mutation workflow
+- `schemas/*.schema.json`: artifact contracts
+- `docs/getting-started.md`: first run
+- `docs/agent-installation.md`: install and verify
+- `docs/usage-guide.md`: prompts and workflows
+- `docs/cli-reference.md`: public interfaces
+- `docs/how-it-works.md`: model and outputs
+- `docs/troubleshooting.md`: recovery

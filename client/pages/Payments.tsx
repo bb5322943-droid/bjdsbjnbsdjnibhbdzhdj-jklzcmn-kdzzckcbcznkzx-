@@ -141,8 +141,8 @@ export default function Payments() {
   const handleExport = () => {
     try {
       // CSV Injection himoyasi
-      const sanitizeCell = (value: any): string => {
-        const str = String(value || '');
+      const sanitizeCell = (value: string | number | null | undefined): string => {
+        const str = String(value ?? '');
         // =, +, -, @ bilan boshlanuvchi qiymatlarni xavfsiz qilish
         if (/^[=+\-@\t\r]/.test(str)) {
           return "'" + str.replace(/"/g, '""');
