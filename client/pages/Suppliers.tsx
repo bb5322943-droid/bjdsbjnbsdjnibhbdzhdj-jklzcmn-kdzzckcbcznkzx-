@@ -164,6 +164,9 @@ export default function Suppliers() {
         }
       );
       
+      // Mahsulotlar ro'yxatini yangilash
+      refetch();
+      
       setReturningProduct(null);
     } catch (error) {
       toast.error("Xatolik yuz berdi", {

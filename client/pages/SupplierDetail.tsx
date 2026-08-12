@@ -122,7 +122,7 @@ export default function SupplierDetail() {
   const { data: detailData, isLoading: detailLoading } = useSupplierDetail(id!);
   const { data: kpiData, isLoading: kpiLoading } = useSupplierKPI(id!);
   const { data: purchasesData, isLoading: purchasesLoading } = useSupplierPurchases(id!);
-  const { data: productsData, isLoading: productsLoading } = useSupplierProducts(id!);
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useSupplierProducts(id!);
   const { data: returnsData, isLoading: returnsLoading } = useSupplierReturns(id!);
   const { data: financialData, isLoading: financialLoading } = useSupplierFinancial(id!);
 
@@ -152,6 +152,9 @@ export default function SupplierDetail() {
       toast.success("Mahsulot qaytarildi!", {
         description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi`,
       });
+      
+      // Mahsulotlar ro'yxatini yangilash
+      refetchProducts();
       
       setShowReturnDialog(false);
     } catch (error) {
