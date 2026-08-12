@@ -556,12 +556,6 @@ export default function Suppliers() {
         actions={
           viewing && (
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setViewing(null)}
-              >
-                Qaytish
-              </Button>
               {viewing.status === "active" && products.filter(p => p.supplier === viewing.name && !p.deletedAt && p.quantity > 0).length > 0 && (
                 <Button
                   variant="outline"
@@ -575,7 +569,7 @@ export default function Suppliers() {
                   className="text-[#cb8535] hover:text-[#b87530]"
                 >
                   <PackageX size={16} className="mr-2" />
-                  Mahsulotni qaytarish
+                  Qaytarish
                 </Button>
               )}
               <Button
@@ -587,6 +581,12 @@ export default function Suppliers() {
                 }}
               >
                 Tahrirlash
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setViewing(null)}
+              >
+                Yopish
               </Button>
             </div>
           )
