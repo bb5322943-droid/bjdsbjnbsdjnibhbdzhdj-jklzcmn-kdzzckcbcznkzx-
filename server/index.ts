@@ -65,6 +65,7 @@ import {
   getSupplierStats,
   getSuppliers,
   getSuppliersWithProducts,
+  restoreSupplier,
   updateSupplier,
 } from "./routes/suppliers";
 import {
@@ -529,6 +530,7 @@ export function createServer() {
   app.get("/api/suppliers/:id", getSupplierDetail);
   app.post("/api/suppliers", createSupplier);
   app.put("/api/suppliers/:id", updateSupplier);
+  app.patch("/api/suppliers/:id/restore", restoreSupplier);
   app.delete("/api/suppliers/:id", deleteSupplier);
 
   // Branches (filiallar) API routes — dashboard moduli bilan himoyalanadi.

@@ -39,6 +39,7 @@ import {
 import {
   useDeleteSupplier,
   useProducts,
+  useRestoreSupplier,
   useSupplierCategories,
   useSupplierStats,
   useSuppliers,
@@ -99,6 +100,7 @@ export default function Suppliers() {
   });
   const deleteSupplier = useDeleteSupplier();
   const updateSupplier = useUpdateSupplier();
+  const restoreSupplier = useRestoreSupplier();
 
   const stats = statsData?.data;
   const suppliers = data?.data ?? [];
@@ -122,11 +124,8 @@ export default function Suppliers() {
 
   const handleRestore = async () => {
     if (!restoring) return;
-    await updateSupplier.mutateAsync({
-      id: restoring.id,
-      status: "active",
-    });
-    toast.success(`${restoring.name} faollashtirилди`);
+    await restoreSupplier.mutateAsync(restoring.id);
+    toast.success(`${restoring.name} faollashtirildi`);
     setRestoring(null);
   };
 

@@ -176,6 +176,33 @@ export const updateSupplier: RequestHandler = (req, res) => {
   res.json(response);
 };
 
+export const restoreSupplier: RequestHandler = (req, res) => {
+  const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  if (supplier.status === "active") {
+    return res.status(400).json({
+      success: false,
+      message: "Ta'minotchi allaqachon faol holatda",
+    });
+  }
+
+  supplier.status = "active";
+  
+  logActivity({
+    action: "Ta'minotchi faollashtirildi",
+    details: supplier.name,
+    icon: "RotateCcw",
+  });
+
+  const response: ApiResponse<Supplier> = {
+    success: true,
+    data: supplier,
+    message: "Ta'minotchi muvaffaqiyatli faollashtirildi",
+  };
+  res.json(response);
+};
+
 export const deleteSupplier: RequestHandler = (req, res) => {
   const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
   if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");

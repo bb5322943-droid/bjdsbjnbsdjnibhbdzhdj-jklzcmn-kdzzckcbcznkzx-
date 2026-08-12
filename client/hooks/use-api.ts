@@ -697,6 +697,17 @@ export function useUpdateSupplier() {
   });
 }
 
+export function useRestoreSupplier() {
+  const invalidate = useInvalidate("suppliers");
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchApi<ApiResponse<Supplier>>(`/suppliers/${id}/restore`, {
+        method: "PATCH",
+      }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteSupplier() {
   const invalidate = useInvalidate("suppliers");
   return useMutation({
