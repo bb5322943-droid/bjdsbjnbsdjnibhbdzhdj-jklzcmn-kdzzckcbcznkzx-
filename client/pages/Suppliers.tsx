@@ -45,6 +45,7 @@ import {
   useSupplierStats,
   useSuppliers,
   useUpdateSupplier,
+  useReturnProductToSupplier,
 } from "@/hooks/use-api";
 import { useDebounced } from "@/hooks/use-debounced";
 import { formatNumber, formatUzPhone } from "@/lib/format";
@@ -103,6 +104,7 @@ export default function Suppliers() {
   const deleteSupplier = useDeleteSupplier();
   const updateSupplier = useUpdateSupplier();
   const restoreSupplier = useRestoreSupplier();
+  const returnProductMutation = useReturnProductToSupplier();
 
   const stats = statsData?.data;
   const suppliers = data?.data ?? [];
@@ -139,27 +141,35 @@ export default function Suppliers() {
   }) => {
     if (!returningProduct) return;
     
-    // Bu yerda backend'ga so'rov yuboriladi
-    // Hozircha faqat toast ko'rsatamiz
-    const product = products.find(p => p.id === data.productId);
-    const reasonLabels: Record<string, string> = {
-      defective: "Nuqsonli mahsulot",
-      wrong_item: "Noto'g'ri mahsulot",
-      damaged: "Shikastlangan",
-      quality: "Sifat muammosi",
-      expired: "Muddati o'tgan",
-      other: "Boshqa sabab",
-    };
-    
-    toast.success(
-      `${returningProduct.name}ga "${product?.name}" (${data.quantity} ta) qaytarildi. Sabab: ${reasonLabels[data.reason]}`
-    );
-    
-    // Real implementatsiyada:
-    // await returnProductToSupplier.mutateAsync({
-    //   supplierId: returningProduct.id,
-    //   ...data
-    // });
+    try {
+      await returnProductMutation.mutateAsync({
+        id: returningProduct.id,
+        ...data,
+      });
+      
+      const product = products.find(p => p.id === data.productId);
+      const reasonLabels: Record<string, string> = {
+        defective: "Nuqsonli mahsulot",
+        wrong_item: "Noto'g'ri mahsulot",
+        damaged: "Shikastlangan",
+        quality: "Sifat muammosi",
+        expired: "Muddati o'tgan",
+        other: "Boshqa sabab",
+      };
+      
+      toast.success(
+        `${returningProduct.name}ga "${product?.name}" (${data.quantity} ta) qaytarildi`,
+        {
+          description: `Sabab: ${reasonLabels[data.reason]}`,
+        }
+      );
+      
+      setReturningProduct(null);
+    } catch (error) {
+      toast.error("Xatolik yuz berdi", {
+        description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
+      });
+    }
   };
 
   const openCreate = () => {
