@@ -63,6 +63,7 @@ import {
   getSupplierCategories,
   getSupplierDetail,
   getSupplierFinancial,
+  getSupplierKPI,
   getSupplierProducts,
   getSupplierPurchases,
   getSupplierReturns,
@@ -536,7 +537,7 @@ export function createServer() {
   app.get("/api/suppliers/:id/products", getSupplierProducts);
   app.get("/api/suppliers/:id/returns", getSupplierReturns);
   app.get("/api/suppliers/:id/financial", getSupplierFinancial);
-  app.get("/api/suppliers/:id/stats", getSupplierStats);
+  app.get("/api/suppliers/:id/stats", getSupplierKPI);
   app.post("/api/suppliers", createSupplier);
   app.put("/api/suppliers/:id", updateSupplier);
   app.patch("/api/suppliers/:id/restore", restoreSupplier);

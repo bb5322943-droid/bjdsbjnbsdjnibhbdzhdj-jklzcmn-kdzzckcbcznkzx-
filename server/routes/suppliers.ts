@@ -361,8 +361,8 @@ export const getSupplierFinancial: RequestHandler = (req, res) => {
   });
 };
 
-/** Ta'minotchi statistikasi (KPI) */
-export const getSupplierStats: RequestHandler = (req, res) => {
+/** Ta'minotchi statistikasi (KPI) - bitta ta'minotchi uchun */
+export const getSupplierKPI: RequestHandler = (req, res) => {
   const supplierId = req.params.id;
   const supplier = suppliers.find((s) => s.id === supplierId && !s.deletedAt);
   
