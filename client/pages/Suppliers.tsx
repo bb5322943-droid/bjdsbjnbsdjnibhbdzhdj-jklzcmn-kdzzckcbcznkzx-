@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PackageX, Plus, RotateCcw, Star, Truck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Supplier } from "@shared/api";
 import {
@@ -73,6 +74,7 @@ function Rating({ value }: { value: number }) {
 }
 
 export default function Suppliers() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [status, setStatus] = useState(ALL);
@@ -247,7 +249,7 @@ export default function Suppliers() {
 
         return (
           <RowActions
-            onView={() => setViewing(supplier)}
+            onView={() => navigate(`/suppliers/${supplier.id}`)}
             onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
             onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
             onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
@@ -399,9 +401,9 @@ export default function Suppliers() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center">
-                        <ViewButton onClick={() => setViewing(supplier)} />
+                        <ViewButton onClick={() => navigate(`/suppliers/${supplier.id}`)} />
                         <RowActions
-                          onView={() => setViewing(supplier)}
+                          onView={() => navigate(`/suppliers/${supplier.id}`)}
                           onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
                           onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
                           onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}

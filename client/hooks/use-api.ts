@@ -717,6 +717,60 @@ export function useDeleteSupplier() {
   });
 }
 
+/** Ta'minotchi batafsil ma'lumotlari */
+export function useSupplierDetail(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "detail", id],
+    queryFn: () => fetchApi<ApiResponse<{ supplier: Supplier; products: any[]; totalValue: number }>>(`/suppliers/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** Ta'minotchining xaridlar tarixi */
+export function useSupplierPurchases(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "purchases", id],
+    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/purchases`),
+    enabled: !!id,
+  });
+}
+
+/** Ta'minotchi yetkazgan mahsulotlar */
+export function useSupplierProducts(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "products", id],
+    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/products`),
+    enabled: !!id,
+  });
+}
+
+/** Ta'minotchiga qaytarilgan mahsulotlar */
+export function useSupplierReturns(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "returns", id],
+    queryFn: () => fetchApi<ApiResponse<any[]>>(`/suppliers/${id}/returns`),
+    enabled: !!id,
+  });
+}
+
+/** Ta'minotchi bilan moliyaviy hisob-kitoblar */
+export function useSupplierFinancial(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "financial", id],
+    queryFn: () => fetchApi<ApiResponse<{ summary: any; history: any[] }>>(`/suppliers/${id}/financial`),
+    enabled: !!id,
+  });
+}
+
+/** Ta'minotchi statistikasi (KPI) */
+export function useSupplierKPI(id: string) {
+  return useQuery({
+    queryKey: ["suppliers", "kpi", id],
+    queryFn: () => fetchApi<ApiResponse<{ totalPurchases: number; ordersCount: number; avgRating: number; returnsCount: number }>>(`/suppliers/${id}/stats`),
+    enabled: !!id,
+  });
+}
+
 // -------------------------------------------------------------- Buyurtmalar
 
 /**

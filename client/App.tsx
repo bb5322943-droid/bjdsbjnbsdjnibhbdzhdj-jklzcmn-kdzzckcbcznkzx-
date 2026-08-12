@@ -24,6 +24,7 @@ import CRM from "./pages/CRM";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
 import Suppliers from "./pages/Suppliers";
+import SupplierDetail from "./pages/SupplierDetail";
 import Purchases from "./pages/Purchases";
 import ProfessionalAttendance from "./pages/ProfessionalAttendance";
 import Payroll from "./pages/Payroll";
@@ -152,6 +153,7 @@ const AppRoutes = () => (
       <Route path="orders" element={<M m="crm"><Orders /></M>} />
       <Route path="customers" element={<M m="crm"><Customers /></M>} />
       <Route path="suppliers" element={<M m="warehouse"><Suppliers /></M>} />
+      <Route path="suppliers/:id" element={<M m="warehouse"><SupplierDetail /></M>} />
       <Route path="purchases" element={<M m="warehouse"><Purchases /></M>} />
       <Route path="debts" element={<M m="crm"><Debts /></M>} />
       <Route path="payments" element={<M m="crm"><Payments /></M>} />

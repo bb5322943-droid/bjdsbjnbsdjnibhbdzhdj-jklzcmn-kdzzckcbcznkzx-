@@ -62,6 +62,10 @@ import {
   deleteSupplier,
   getSupplierCategories,
   getSupplierDetail,
+  getSupplierFinancial,
+  getSupplierProducts,
+  getSupplierPurchases,
+  getSupplierReturns,
   getSupplierStats,
   getSuppliers,
   getSuppliersWithProducts,
@@ -528,6 +532,11 @@ export function createServer() {
   app.get("/api/suppliers/categories", getSupplierCategories);
   app.get("/api/suppliers", getSuppliers);
   app.get("/api/suppliers/:id", getSupplierDetail);
+  app.get("/api/suppliers/:id/purchases", getSupplierPurchases);
+  app.get("/api/suppliers/:id/products", getSupplierProducts);
+  app.get("/api/suppliers/:id/returns", getSupplierReturns);
+  app.get("/api/suppliers/:id/financial", getSupplierFinancial);
+  app.get("/api/suppliers/:id/stats", getSupplierStats);
   app.post("/api/suppliers", createSupplier);
   app.put("/api/suppliers/:id", updateSupplier);
   app.patch("/api/suppliers/:id/restore", restoreSupplier);

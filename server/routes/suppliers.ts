@@ -229,3 +229,163 @@ export const deleteSupplier: RequestHandler = (req, res) => {
   };
   res.json(response);
 };
+
+/** Ta'minotchining xaridlar tarixi */
+export const getSupplierPurchases: RequestHandler = (req, res) => {
+  const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  // Ushbu ta'minotchidan bo'lgan barcha xaridlar
+  const supplierPurchases = active(purchases).filter(
+    (p) => p.supplierId === supplier.id || p.supplierName === supplier.name
+  );
+
+  // Har bir xaridning mahsulotlari bilan
+  const purchasesWithDetails = supplierPurchases.map((purchase) => ({
+    ...purchase,
+    products: purchase.items, // items allaqachon mahsulotlar ro'yxati
+  }));
+
+  res.json({
+    success: true,
+    data: purchasesWithDetails,
+  });
+};
+
+/** Ta'minotchi yetkazgan mahsulotlar ro'yxati */
+export const getSupplierProducts: RequestHandler = (req, res) => {
+  const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  const suppliedProducts = active(products).filter((p) => p.supplier === supplier.name);
+
+  // Har bir mahsulot uchun qo'shimcha ma'lumotlar
+  const productsWithDetails = suppliedProducts.map((product) => ({
+    ...product,
+    sku: `${product.category.substring(0, 3).toUpperCase()}-${product.id}`,
+    lastDeliveryDate: new Date().toISOString().split("T")[0], // Mock: oxirgi yetkazilgan sana
+  }));
+
+  res.json({
+    success: true,
+    data: productsWithDetails,
+  });
+};
+
+/** Ta'minotchiga qaytarilgan mahsulotlar tarixi */
+export const getSupplierReturns: RequestHandler = (req, res) => {
+  const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  // Mock data: Hozircha bo'sh ro'yxat qaytaramiz
+  // Keyinchalik returns table yaratilganda to'ldiriladi
+  const returns: any[] = [];
+
+  res.json({
+    success: true,
+    data: returns,
+  });
+};
+
+/** Ta'minotchi bilan moliyaviy hisob-kitoblar */
+export const getSupplierFinancial: RequestHandler = (req, res) => {
+  const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  // Ushbu ta'minotchidan bo'lgan barcha xaridlar
+  const supplierPurchases = active(purchases).filter(
+    (p) => p.supplierId === supplier.id || p.supplierName === supplier.name
+  );
+
+  // Moliyaviy hisobotlar
+  let totalPurchases = 0;
+  let totalPaid = 0;
+  const financialHistory: any[] = [];
+
+  supplierPurchases.forEach((purchase) => {
+    totalPurchases += purchase.total;
+
+    // To'lov holati bo'yicha
+    if (purchase.paymentStatus === "paid") {
+      totalPaid += purchase.total;
+      financialHistory.push({
+        id: `PAY-${purchase.id}`,
+        date: purchase.orderDate,
+        type: "payment",
+        description: `To'lov - ${purchase.purchaseNumber}`,
+        amount: purchase.total,
+        balance: totalPaid - totalPurchases,
+      });
+    } else if (purchase.paymentStatus === "partial") {
+      const partialAmount = purchase.total * 0.5; // Mock: 50% to'langan deb hisoblash
+      totalPaid += partialAmount;
+      financialHistory.push({
+        id: `PAY-${purchase.id}`,
+        date: purchase.orderDate,
+        type: "payment",
+        description: `Qisman to'lov - ${purchase.purchaseNumber}`,
+        amount: partialAmount,
+        balance: totalPaid - totalPurchases,
+      });
+    } else {
+      // unpaid - qarz
+      financialHistory.push({
+        id: `DEBT-${purchase.id}`,
+        date: purchase.orderDate,
+        type: "debt",
+        description: `Qarz - ${purchase.purchaseNumber}`,
+        amount: purchase.total,
+        balance: totalPaid - totalPurchases,
+      });
+    }
+  });
+
+  const currentDebt = totalPurchases - totalPaid;
+  const lastPaymentDate = financialHistory
+    .filter((f) => f.type === "payment")
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.date || null;
+
+  res.json({
+    success: true,
+    data: {
+      summary: {
+        totalPurchases,
+        totalPaid,
+        currentDebt,
+        lastPaymentDate,
+      },
+      history: financialHistory.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    },
+  });
+};
+
+/** Ta'minotchi statistikasi (KPI) */
+export const getSupplierStats: RequestHandler = (req, res) => {
+  const supplierId = req.params.id;
+  const supplier = suppliers.find((s) => s.id === supplierId && !s.deletedAt);
+  
+  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+
+  // Xaridlar
+  const supplierPurchases = active(purchases).filter(
+    (p) => p.supplierId === supplier.id || p.supplierName === supplier.name
+  );
+
+  const totalPurchases = supplierPurchases.reduce((sum, p) => sum + p.total, 0);
+  const ordersCount = supplierPurchases.length;
+
+  // Qaytarilgan mahsulotlar (mock: hozircha 0)
+  const returnsCount = 0;
+
+  res.json({
+    success: true,
+    data: {
+      totalPurchases,
+      ordersCount,
+      avgRating: supplier.rating,
+      returnsCount,
+    },
+  });
+};
