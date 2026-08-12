@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, RotateCcw, Star, Truck } from "lucide-react";
+import { PackageX, Plus, RotateCcw, Star, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Supplier } from "@shared/api";
 import {
@@ -11,6 +11,7 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DetailDialog } from "@/components/DetailDialog";
 import { SupplierDialog } from "@/components/SupplierDialog";
+import { ProductReturnDialog } from "@/components/ProductReturnDialog";
 import {
   ErrorState,
   HeroStat,
@@ -24,6 +25,10 @@ import {
   ViewToggle,
 } from "@/components/PageKit";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -78,6 +83,7 @@ export default function Suppliers() {
   const [viewing, setViewing] = useState<Supplier | null>(null);
   const [deleting, setDeleting] = useState<Supplier | null>(null);
   const [restoring, setRestoring] = useState<Supplier | null>(null);
+  const [returningProduct, setReturningProduct] = useState<Supplier | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -122,6 +128,37 @@ export default function Suppliers() {
     });
     toast.success(`${restoring.name} faollashtirилди`);
     setRestoring(null);
+  };
+
+  const handleProductReturn = async (data: {
+    productId: string;
+    quantity: number;
+    reason: string;
+    note: string;
+  }) => {
+    if (!returningProduct) return;
+    
+    // Bu yerda backend'ga so'rov yuboriladi
+    // Hozircha faqat toast ko'rsatamiz
+    const product = products.find(p => p.id === data.productId);
+    const reasonLabels: Record<string, string> = {
+      defective: "Nuqsonli mahsulot",
+      wrong_item: "Noto'g'ri mahsulot",
+      damaged: "Shikastlangan",
+      quality: "Sifat muammosi",
+      expired: "Muddati o'tgan",
+      other: "Boshqa sabab",
+    };
+    
+    toast.success(
+      `${returningProduct.name}ga "${product?.name}" (${data.quantity} ta) qaytarildi. Sabab: ${reasonLabels[data.reason]}`
+    );
+    
+    // Real implementatsiyada:
+    // await returnProductToSupplier.mutateAsync({
+    //   supplierId: returningProduct.id,
+    //   ...data
+    // });
   };
 
   const openCreate = () => {
@@ -204,15 +241,34 @@ export default function Suppliers() {
     {
       header: "",
       align: "right",
-      cell: (supplier) => (
-        <RowActions
-          onView={() => setViewing(supplier)}
-          onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
-          onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
-          onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
-          returnText="Qaytarish"
-        />
-      ),
+      cell: (supplier) => {
+        const hasProducts = products.filter(
+          p => p.supplier === supplier.name && !p.deletedAt && p.quantity > 0
+        ).length > 0;
+
+        return (
+          <RowActions
+            onView={() => setViewing(supplier)}
+            onEdit={supplier.status === "active" ? () => openEdit(supplier) : undefined}
+            onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
+            onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
+            returnText="Qaytarish"
+          >
+            {supplier.status === "active" && hasProducts && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => setReturningProduct(supplier)}
+                  className="gap-2"
+                >
+                  <PackageX size={15} className="text-[#cb8535]" />
+                  Mahsulotni qaytarish
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+          </RowActions>
+        );
+      },
     },
   ];
 
@@ -351,7 +407,20 @@ export default function Suppliers() {
                           onDelete={supplier.status === "active" ? () => setDeleting(supplier) : undefined}
                           onReturn={supplier.status === "inactive" ? () => setRestoring(supplier) : undefined}
                           returnText="Qaytarish"
-                        />
+                        >
+                          {supplier.status === "active" && productCount > 0 && (
+                            <>
+                              <DropdownMenuItem
+                                onSelect={() => setReturningProduct(supplier)}
+                                className="gap-2"
+                              >
+                                <PackageX size={15} className="text-[#cb8535]" />
+                                Mahsulotni qaytarish
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                        </RowActions>
                       </div>
                     </div>
                     <div className="mt-4 flex items-center justify-between">
@@ -524,6 +593,14 @@ export default function Suppliers() {
         }
         confirmText="Qaytarish"
         onConfirm={handleRestore}
+      />
+
+      <ProductReturnDialog
+        open={Boolean(returningProduct)}
+        onOpenChange={(open) => !open && setReturningProduct(null)}
+        supplier={returningProduct}
+        products={products}
+        onSubmit={handleProductReturn}
       />
     </>
   );
