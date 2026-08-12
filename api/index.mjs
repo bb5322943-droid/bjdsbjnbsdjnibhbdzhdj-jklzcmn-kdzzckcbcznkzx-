@@ -11,7 +11,7 @@ import { dirname, join, resolve as resolve$1 } from "node:path";
 import * as schedule from "node-schedule";
 import { z } from "zod";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { DatabaseSync } from "node:sqlite";
 //#region server/lib/logger.ts
 var logDir = resolve(process.cwd(), "logs");
@@ -143,23 +143,39 @@ var handleDemo = (req, res) => {
 var USE_POSTGRES = !!process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgresql://");
 if (USE_POSTGRES) logger.info("Using PostgreSQL database");
 else logger.info("Using SQLite database");
-var DB_PATH = process.env.DATABASE_PATH ? resolve$1(process.env.DATABASE_PATH) : resolve$1(process.cwd(), "data", "orbis.db");
+var IS_VERCEL = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
+var DB_PATH = (() => {
+	if (process.env.DATABASE_PATH) return resolve$1(process.env.DATABASE_PATH);
+	if (IS_VERCEL) {
+		logger.info("🔧 Vercel detected - using /tmp directory for SQLite");
+		return resolve$1("/tmp", "orbis.db");
+	}
+	return resolve$1(process.cwd(), "data", "orbis.db");
+})();
 var database = null;
 /** Ochilgan ulanishni qaytaradi, kerak bo'lsa fayl va jadvallarni yaratadi. */
 function db() {
 	if (database) return database;
 	if (USE_POSTGRES) throw new Error("PostgreSQL mode enabled but db() called. Use db-postgres.ts functions instead.");
 	try {
-		mkdirSync$1(dirname(DB_PATH), { recursive: true });
-		logger.info(`Database papkasi yaratildi: ${dirname(DB_PATH)}`);
+		const dbDir = dirname(DB_PATH);
+		mkdirSync$1(dbDir, { recursive: true });
+		logger.info(`📂 Database papkasi yaratildi: ${dbDir}`);
 	} catch (error) {
-		logger.error("Database papkasini yaratishda xatolik:", error);
+		logger.error("❌ Database papkasini yaratishda xatolik:", error);
+		if (IS_VERCEL) logger.error("🚨 CRITICAL: Cannot create /tmp directory on Vercel!");
 	}
-	database = new DatabaseSync(DB_PATH);
-	database.exec("PRAGMA journal_mode = WAL");
-	database.exec("PRAGMA foreign_keys = ON");
-	createSchema(database);
-	logger.info(`✅ SQLite database ishga tushdi: ${DB_PATH}`);
+	try {
+		database = new DatabaseSync(DB_PATH);
+		database.exec("PRAGMA journal_mode = WAL");
+		database.exec("PRAGMA foreign_keys = ON");
+		createSchema(database);
+		logger.info(`✅ SQLite database ishga tushdi: ${DB_PATH}`);
+		logger.info(`📊 Database location: ${IS_VERCEL ? "/tmp (Vercel)" : "local data/"}`);
+	} catch (error) {
+		logger.error("❌ CRITICAL: Database initialization failed:", error);
+		throw error;
+	}
 	return database;
 }
 /**
@@ -732,15 +748,18 @@ function isEmpty() {
 * bazada saqlanadi.
 */
 var KEY_LENGTH = 64;
-process.env.JWT_SECRET;
+var JWT_SECRET = process.env.JWT_SECRET || "default-secret-change-in-production";
 process.env.JWT_REFRESH_SECRET;
-process.env.JWT_EXPIRES_IN;
+var JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "12h";
 process.env.JWT_REFRESH_EXPIRES_IN;
 /**
 * DIQQAT: Yangi hisob uchun boshlang'ich parol environment variable'dan olinadi.
 * Production'da albatta .env faylida o'rnatilishi kerak!
+* 
+* DEFAULT (Deploy): OrbisAdmin2024!
+* TEST (Demo): 123456
 */
-var DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || "";
+var DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || "OrbisAdmin2024!";
 function hashPassword(password) {
 	const salt = randomBytes(16).toString("hex");
 	return `${salt}:${scryptSync(password, salt, KEY_LENGTH).toString("hex")}`;
@@ -758,24 +777,15 @@ function verifyPassword(password, stored) {
 	if (expected.length !== actual.length) return false;
 	return timingSafeEqual(expected, actual);
 }
-/**
-* Eski sessiya tizimi (backward compatibility uchun)
-*/
-var SESSION_TTL_MS = 720 * 60 * 1e3;
-function createSession(userId) {
-	const token = randomBytes(32).toString("hex");
-	db().prepare("INSERT INTO sessions (token, userId, expiresAt) VALUES (?, ?, ?)").run(token, userId, Date.now() + SESSION_TTL_MS);
-	return token;
+function createAccessToken(payload) {
+	return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
-/** Token bo'yicha foydalanuvchi ID sini qaytaradi; muddati o'tgan bo'lsa null. */
-function resolveSession(token) {
-	const row = db().prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?").get(token);
-	if (!row) return null;
-	if (row.expiresAt < Date.now()) {
-		destroySession(token);
+function verifyAccessToken(token) {
+	try {
+		return jwt.verify(token, JWT_SECRET);
+	} catch {
 		return null;
 	}
-	return row.userId;
 }
 function destroySession(token) {
 	db().prepare("DELETE FROM sessions WHERE token = ?").run(token);
@@ -1989,22 +1999,37 @@ function buildLeaveRequests(employees) {
 		};
 	});
 }
+/**
+* Oddiy 4 ta foydalanuvchi: admin, menejr, hisobchi, kassir
+* 
+* DEPLOY UCHUN DEFAULT LOGIN/PAROL:
+* Login: admin@orbiserp.uz
+* Parol: OrbisAdmin2024!
+* 
+* Bu parol production'da ham ishlaydi (environment variable bo'lmasa)
+*/
+var DEMO_PASSWORD = "123456";
+var PRODUCTION_ADMIN_EMAIL$1 = "admin@orbiserp.uz";
+var PRODUCTION_ADMIN_PASSWORD$1 = "OrbisAdmin2024!";
 function buildUsers(employees) {
 	const now = /* @__PURE__ */ new Date();
-	const passwordHash = hashPassword("123456");
 	const createdDate = isoDate(now.getFullYear(), now.getMonth(), now.getDate());
-	return [
+	const adminEmail = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL$1;
+	const adminPassword = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD$1;
+	const adminPasswordHash = hashPassword(adminPassword);
+	const demoPasswordHash = hashPassword("123456");
+	const users = [
 		{
 			id: "1",
 			name: "Administrator",
 			login: "admin",
-			email: "admin@test.uz",
+			email: adminEmail,
 			role: "admin",
 			status: "active",
 			lastLogin: now.toISOString(),
 			employeeId: null,
 			createdDate,
-			passwordHash
+			passwordHash: adminPasswordHash
 		},
 		{
 			id: "2",
@@ -2016,7 +2041,7 @@ function buildUsers(employees) {
 			lastLogin: now.toISOString(),
 			employeeId: null,
 			createdDate,
-			passwordHash
+			passwordHash: demoPasswordHash
 		},
 		{
 			id: "3",
@@ -2028,7 +2053,7 @@ function buildUsers(employees) {
 			lastLogin: now.toISOString(),
 			employeeId: null,
 			createdDate,
-			passwordHash
+			passwordHash: demoPasswordHash
 		},
 		{
 			id: "4",
@@ -2040,9 +2065,19 @@ function buildUsers(employees) {
 			lastLogin: now.toISOString(),
 			employeeId: null,
 			createdDate,
-			passwordHash
+			passwordHash: demoPasswordHash
 		}
 	];
+	console.log("\n" + "=".repeat(60));
+	console.log("🔐 ADMIN LOGIN MA'LUMOTLARI:");
+	console.log("=".repeat(60));
+	console.log(`📧 Email: ${adminEmail}`);
+	console.log(`👤 Username: admin`);
+	console.log(`🔑 Password: ${adminPassword}`);
+	console.log("=".repeat(60));
+	console.log(`📝 Boshqa foydalanuvchilar paroli: ${DEMO_PASSWORD}`);
+	console.log("=".repeat(60) + "\n");
+	return users;
 }
 /** "YYYY-MM" davridagi ish (dam olishsiz) kunlari — dush–juma. */
 function workingDaysOf(year, month) {
@@ -2199,25 +2234,37 @@ function buildSeedData() {
 * qayta yoziladi. Shu sababli kiritilgan yozuvlar qayta ishga tushirilgandan keyin
 * ham saqlanib qoladi.
 */
-if (isEmpty()) {
-	const seed = buildSeedData();
-	writeTable("employees", seed.employees);
-	writeTable("products", seed.products);
-	writeTable("customers", seed.customers);
-	writeTable("suppliers", seed.suppliers);
-	writeTable("branches", seed.branches);
-	writeTable("orders", seed.orders);
-	writeTable("purchases", seed.purchases);
-	writeTable("invoices", seed.invoices);
-	writeTable("attendance", seed.attendance);
-	writeTable("leave_requests", seed.leaveRequests);
-	writeTable("users", seed.users);
-	writeTable("movements", seed.movements);
-	writeTable("deals", seed.deals);
-	writeTable("payrolls", seed.payrolls);
-	writeTable("transactions", seed.transactions);
-	writeTable("activities", seed.activities);
-}
+console.log("🔍 Checking database state...");
+var dbEmpty = isEmpty();
+console.log(`📊 Database empty: ${dbEmpty}`);
+if (dbEmpty) {
+	console.log("🌱 Seeding database with demo data...");
+	try {
+		const seed = buildSeedData();
+		console.log("📝 Writing tables...");
+		writeTable("employees", seed.employees);
+		writeTable("products", seed.products);
+		writeTable("customers", seed.customers);
+		writeTable("suppliers", seed.suppliers);
+		writeTable("branches", seed.branches);
+		writeTable("orders", seed.orders);
+		writeTable("purchases", seed.purchases);
+		writeTable("invoices", seed.invoices);
+		writeTable("attendance", seed.attendance);
+		writeTable("leave_requests", seed.leaveRequests);
+		writeTable("users", seed.users);
+		writeTable("movements", seed.movements);
+		writeTable("deals", seed.deals);
+		writeTable("payrolls", seed.payrolls);
+		writeTable("transactions", seed.transactions);
+		writeTable("activities", seed.activities);
+		console.log("✅ Database seeded successfully");
+	} catch (seedError) {
+		console.error("❌ Database seeding failed:", seedError);
+		throw seedError;
+	}
+} else console.log("✅ Database already contains data");
+console.log("📖 Reading tables from database...");
 var employees$1 = readTable("employees");
 var products$1 = readTable("products");
 var customers$1 = readTable("customers");
@@ -2225,7 +2272,7 @@ var suppliers$1 = readTable("suppliers");
 var branches = readTable("branches");
 var orders$1 = readTable("orders");
 var purchases$1 = readTable("purchases");
-var invoices$1 = readTable("invoices");
+var invoices = readTable("invoices");
 var attendance = readTable("attendance");
 var leaveRequests = readTable("leave_requests");
 var users$1 = readTable("users");
@@ -2237,6 +2284,8 @@ var activities = readTable("activities");
 var debtPayments = readTable("debt_payments");
 var sales = readTable("sales");
 var refunds = readTable("refunds");
+console.log("✅ Tables loaded successfully");
+console.log(`📊 Data counts: users=${users$1?.length || 0}, employees=${employees$1?.length || 0}, products=${products$1?.length || 0}`);
 /**
 * Auth qo'shilishidan oldin yaratilgan bazada parol hash'i bo'sh bo'ladi.
 * Bunday hisoblarga standart parol beriladi, aks holda hech kim kira olmaydi.
@@ -2246,6 +2295,90 @@ if (usersMissingPassword.length > 0) {
 	for (const user of usersMissingPassword) user.passwordHash = hashPassword(DEFAULT_PASSWORD);
 	writeTable("users", users$1);
 	console.info(`${usersMissingPassword.length} ta hisobga standart parol o'rnatildi: ${DEFAULT_PASSWORD}`);
+}
+/**
+* Production deploymentda admin foydalanuvchini yaratish yoki yangilash.
+* Environment variable'lardan yoki hardcoded qiymatlardan olinadi.
+* 
+* DEPLOY UCHUN DEFAULT LOGIN (hardcoded - ishonchli):
+* Email: admin@orbiserp.uz
+* Parol: OrbisAdmin2024!
+*/
+var PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
+var PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
+var ADMIN_EMAIL = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
+var ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
+console.log("🔐 Admin initialization:");
+console.log("   Email from env:", process.env.ADMIN_EMAIL || "not set");
+console.log("   Password from env:", process.env.ADMIN_PASSWORD ? "***" : "not set");
+console.log("   Using Email:", ADMIN_EMAIL);
+console.log("   Using Password:", ADMIN_PASSWORD_FROM_ENV ? "***" : "empty");
+console.log("   Users array length:", users$1?.length || 0);
+try {
+	if (!ADMIN_PASSWORD_FROM_ENV) {
+		console.error("❌ CRITICAL: Admin password not configured!");
+		throw new Error("Admin password is required");
+	}
+	let adminUser = users$1.find((u) => u.email === ADMIN_EMAIL || u.login === "admin" || u.role === "admin");
+	console.log("🔍 Admin user search result:", adminUser ? "found" : "not found");
+	if (!adminUser) {
+		console.log("📝 Creating new admin user...");
+		const now = /* @__PURE__ */ new Date();
+		const newAdminId = nextId();
+		adminUser = {
+			id: newAdminId,
+			name: "Administrator",
+			login: "admin",
+			email: ADMIN_EMAIL,
+			role: "admin",
+			status: "active",
+			lastLogin: now.toISOString(),
+			employeeId: null,
+			createdDate: now.toISOString().split("T")[0],
+			passwordHash: hashPassword(ADMIN_PASSWORD_FROM_ENV)
+		};
+		users$1.push(adminUser);
+		writeTable("users", users$1);
+		console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
+		console.info("🔑 Admin login ma'lumotlari:");
+		console.info(`   ID: ${newAdminId}`);
+		console.info(`   Login: admin`);
+		console.info(`   Email: ${ADMIN_EMAIL}`);
+		console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+		console.info(`   Password hash length: ${adminUser.passwordHash?.length || 0}`);
+	} else {
+		console.log("♻️ Updating existing admin user...");
+		const oldHash = adminUser.passwordHash;
+		adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
+		adminUser.email = ADMIN_EMAIL;
+		adminUser.login = "admin";
+		adminUser.role = "admin";
+		adminUser.status = "active";
+		writeTable("users", users$1);
+		console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
+		console.info("🔑 Admin login ma'lumotlari:");
+		console.info(`   ID: ${adminUser.id}`);
+		console.info(`   Login: ${adminUser.login}`);
+		console.info(`   Email: ${ADMIN_EMAIL}`);
+		console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+		console.info(`   Old hash length: ${oldHash?.length || 0}`);
+		console.info(`   New hash length: ${adminUser.passwordHash?.length || 0}`);
+	}
+	const verifyAdmin = users$1.find((u) => u.login === "admin" || u.email === ADMIN_EMAIL);
+	if (!verifyAdmin) console.error("❌ CRITICAL: Admin user not found after creation!");
+	else console.log("✅ Admin user verification passed:", {
+		id: verifyAdmin.id,
+		login: verifyAdmin.login,
+		email: verifyAdmin.email,
+		hasPassword: !!verifyAdmin.passwordHash,
+		passwordHashLength: verifyAdmin.passwordHash?.length || 0,
+		status: verifyAdmin.status,
+		role: verifyAdmin.role
+	});
+} catch (adminError) {
+	console.error("❌ CRITICAL: Admin initialization failed!");
+	console.error("Error:", adminError);
+	throw adminError;
 }
 /**
 * Xotiradagi holatni bazaga yozadi.
@@ -2259,7 +2392,7 @@ function persist() {
 	writeTable("branches", branches);
 	writeTable("orders", orders$1);
 	writeTable("purchases", purchases$1);
-	writeTable("invoices", invoices$1);
+	writeTable("invoices", invoices);
 	writeTable("attendance", attendance);
 	writeTable("leave_requests", leaveRequests);
 	writeTable("users", users$1);
@@ -2348,7 +2481,6 @@ function removeById(list, id) {
 var customers = () => active(customers$1);
 var deals = () => active(deals$1);
 var employees = () => active(employees$1);
-var invoices = () => active(invoices$1);
 var orders = () => active(orders$1);
 var payrolls = () => active(payrolls$1);
 var products = () => active(products$1);
@@ -2763,21 +2895,6 @@ function purchaseStats() {
 		}, 0)
 	};
 }
-/** Muddati o'tgan faktura — to'liq to'lanmagan va to'lov sanasi o'tib ketgan. */
-function isOverdueInvoice(invoice) {
-	return invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.status !== "draft" && invoice.dueDate < todayISO();
-}
-function invoiceStats() {
-	const active = invoices().filter((i) => i.status !== "cancelled");
-	const outstanding = active.filter((i) => i.paidAmount < i.amount);
-	return {
-		totalInvoices: invoices().length,
-		outstandingCount: outstanding.length,
-		outstandingAmount: outstanding.reduce((sum, i) => sum + (i.amount - i.paidAmount), 0),
-		overdueCount: active.filter(isOverdueInvoice).length,
-		paidThisMonth: active.filter((i) => i.status === "paid" && inPeriod(i.issueDate, currentPeriod$1())).length
-	};
-}
 function userStats() {
 	const weekAgo = (/* @__PURE__ */ new Date(Date.now() - 10080 * 60 * 1e3)).toISOString();
 	return {
@@ -3187,7 +3304,7 @@ var transactionSchema = z.object({
 	type: z.enum(["income", "expense"]),
 	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "sana YYYY-MM-DD ko'rinishida bo'lishi kerak").optional()
 });
-var querySchema$12 = paginationSchema.extend({
+var querySchema$11 = paginationSchema.extend({
 	type: z.enum([
 		"all",
 		"income",
@@ -3224,7 +3341,7 @@ function filterTransactions(query) {
 	}).sort((a, b) => b.date.localeCompare(a.date));
 }
 var getTransactions = (req, res) => {
-	const query = querySchema$12.parse(req.query);
+	const query = querySchema$11.parse(req.query);
 	res.json(paginate(filterTransactions(query), query.page, query.limit));
 };
 /** Mavjud tranzaksiyalardagi kategoriyalar — filtr ro'yxatini to'ldirish uchun. */
@@ -3237,7 +3354,7 @@ var getTransactionCategories = (_req, res) => {
 };
 /** Filtrga mos tranzaksiyalarni CSV holida yuklab beradi. */
 var exportTransactions = (req, res) => {
-	const rows = filterTransactions(querySchema$12.parse(req.query));
+	const rows = filterTransactions(querySchema$11.parse(req.query));
 	const escape = (value) => {
 		return `"${String(value).replace(/"/g, "\"\"")}"`;
 	};
@@ -3333,7 +3450,7 @@ var employeeSchema = z.object({
 		"sick_leave"
 	]).optional()
 });
-var querySchema$11 = paginationSchema.extend({
+var querySchema$10 = paginationSchema.extend({
 	department: z.string().optional(),
 	status: z.enum([
 		"active",
@@ -3356,7 +3473,7 @@ var getHRBreakdown = (_req, res) => {
 	});
 };
 var getEmployees = (req, res) => {
-	const query = querySchema$11.parse(req.query);
+	const query = querySchema$10.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(employees$1).filter((e) => {
 		if (search && !e.name.toLowerCase().includes(search) && !e.position.toLowerCase().includes(search) && !e.department.toLowerCase().includes(search) && !e.email.toLowerCase().includes(search)) return false;
@@ -3452,7 +3569,7 @@ var productSchema = z.object({
 	category: z.string().trim().min(1).catch("Boshqa"),
 	supplier: z.string().trim().min(1).catch("Noma'lum")
 });
-var querySchema$10 = paginationSchema.extend({
+var querySchema$9 = paginationSchema.extend({
 	category: z.string().optional(),
 	location: z.string().optional(),
 	lowStockOnly: z.string().transform((value) => value === "true").catch(false)
@@ -3472,7 +3589,7 @@ var getWarehouseBreakdown = (_req, res) => {
 	});
 };
 var getProducts = (req, res) => {
-	const query = querySchema$10.parse(req.query);
+	const query = querySchema$9.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(products$1).filter((p) => {
 		if (search && !p.name.toLowerCase().includes(search) && !p.category.toLowerCase().includes(search) && !p.supplier.toLowerCase().includes(search)) return false;
@@ -3645,7 +3762,7 @@ var customerSchema = z.object({
 	note: z.string().trim().catch(""),
 	status: z.enum(["active", "inactive"]).optional()
 });
-var querySchema$9 = paginationSchema.extend({
+var querySchema$8 = paginationSchema.extend({
 	type: z.enum(["company", "individual"]).optional().catch(void 0),
 	region: z.string().optional(),
 	status: z.enum(["active", "inactive"]).optional().catch(void 0)
@@ -3658,7 +3775,7 @@ var getCustomerStats = (_req, res) => {
 	res.json(response);
 };
 var getCustomers = (req, res) => {
-	const query = querySchema$9.parse(req.query);
+	const query = querySchema$8.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(customers$1).filter((c) => {
 		if (search && !c.name.toLowerCase().includes(search) && !c.contactPerson.toLowerCase().includes(search) && !c.email.toLowerCase().includes(search) && !c.phone.includes(search)) return false;
@@ -3784,7 +3901,7 @@ var supplierSchema = z.object({
 	rating: z.coerce.number().min(1).max(5).catch(3),
 	status: z.enum(["active", "inactive"]).optional()
 });
-var querySchema$8 = paginationSchema.extend({
+var querySchema$7 = paginationSchema.extend({
 	category: z.string().optional(),
 	status: z.enum(["active", "inactive"]).optional().catch(void 0)
 });
@@ -3796,7 +3913,7 @@ var getSupplierStats = (_req, res) => {
 	res.json(response);
 };
 var getSuppliers = (req, res) => {
-	const query = querySchema$8.parse(req.query);
+	const query = querySchema$7.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(suppliers$1).filter((s) => {
 		if (search && !s.name.toLowerCase().includes(search) && !s.contactPerson.toLowerCase().includes(search) && !s.category.toLowerCase().includes(search) && !s.email.toLowerCase().includes(search)) return false;
@@ -3881,6 +3998,26 @@ var updateSupplier = (req, res) => {
 	};
 	res.json(response);
 };
+var restoreSupplier = (req, res) => {
+	const supplier = suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt);
+	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+	if (supplier.status === "active") return res.status(400).json({
+		success: false,
+		message: "Ta'minotchi allaqachon faol holatda"
+	});
+	supplier.status = "active";
+	logActivity({
+		action: "Ta'minotchi faollashtirildi",
+		details: supplier.name,
+		icon: "RotateCcw"
+	});
+	const response = {
+		success: true,
+		data: supplier,
+		message: "Ta'minotchi muvaffaqiyatli faollashtirildi"
+	};
+	res.json(response);
+};
 var deleteSupplier = (req, res) => {
 	const supplier = suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt);
 	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
@@ -3913,7 +4050,7 @@ var branchSchema = z.object({
 	note: z.string().trim().catch(""),
 	status: z.enum(["active", "inactive"]).optional()
 });
-var querySchema$7 = paginationSchema.extend({
+var querySchema$6 = paginationSchema.extend({
 	type: z.enum(["head_office", "branch"]).optional().catch(void 0),
 	region: z.string().optional(),
 	status: z.enum(["active", "inactive"]).optional().catch(void 0)
@@ -3931,7 +4068,7 @@ var getBranchStats = (_req, res) => {
 	res.json(response);
 };
 var getBranches = (req, res) => {
-	const query = querySchema$7.parse(req.query);
+	const query = querySchema$6.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(branches).filter((b) => {
 		if (search && !b.name.toLowerCase().includes(search) && !b.manager.toLowerCase().includes(search) && !b.region.toLowerCase().includes(search) && !b.phone.includes(search)) return false;
@@ -4057,7 +4194,7 @@ var orderSchema = z.object({
 	status: z.enum(ORDER_STATUSES).optional(),
 	paymentStatus: z.enum(PAYMENT_STATUSES$1).optional()
 });
-var querySchema$6 = paginationSchema.extend({
+var querySchema$5 = paginationSchema.extend({
 	status: z.enum(ORDER_STATUSES).optional().catch(void 0),
 	paymentStatus: z.enum(PAYMENT_STATUSES$1).optional().catch(void 0),
 	customerId: z.string().optional()
@@ -4155,7 +4292,7 @@ var getOrderBreakdown = (_req, res) => {
 	res.json(response);
 };
 var getOrders = (req, res) => {
-	const query = querySchema$6.parse(req.query);
+	const query = querySchema$5.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(orders$1).filter((o) => {
 		if (search && !o.orderNumber.toLowerCase().includes(search) && !o.customerName.toLowerCase().includes(search) && !o.assignedTo.toLowerCase().includes(search) && !o.items.some((item) => item.productName.toLowerCase().includes(search))) return false;
@@ -4330,7 +4467,7 @@ var purchaseSchema = z.object({
 	status: z.enum(PURCHASE_STATUSES).optional(),
 	paymentStatus: z.enum(PAYMENT_STATUSES).optional()
 });
-var querySchema$5 = paginationSchema.extend({
+var querySchema$4 = paginationSchema.extend({
 	status: z.enum(PURCHASE_STATUSES).optional().catch(void 0),
 	paymentStatus: z.enum(PAYMENT_STATUSES).optional().catch(void 0),
 	supplierId: z.string().optional()
@@ -4408,7 +4545,7 @@ var getPurchaseStats = (_req, res) => {
 	res.json(response);
 };
 var getPurchases = (req, res) => {
-	const query = querySchema$5.parse(req.query);
+	const query = querySchema$4.parse(req.query);
 	const search = query.search.toLowerCase();
 	const filtered = active(purchases$1).filter((p) => {
 		if (search && !p.purchaseNumber.toLowerCase().includes(search) && !p.supplierName.toLowerCase().includes(search) && !p.createdBy.toLowerCase().includes(search) && !p.items.some((item) => item.productName.toLowerCase().includes(search))) return false;
@@ -4518,188 +4655,6 @@ var deletePurchase = (req, res) => {
 		success: true,
 		data: null,
 		message: "Xarid buyurtmasi o'chirildi"
-	});
-};
-//#endregion
-//#region server/routes/invoices.ts
-var INVOICE_STATUSES = [
-	"draft",
-	"sent",
-	"paid",
-	"overdue",
-	"cancelled"
-];
-var invoiceSchema = z.object({
-	customerId: z.string().trim().min(1, "mijoz tanlanishi shart"),
-	orderId: z.string().trim().nullable().optional(),
-	amount: z.coerce.number().positive("summa noldan katta bo'lishi kerak"),
-	dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "sana YYYY-MM-DD ko'rinishida bo'lishi kerak"),
-	note: z.string().trim().catch(""),
-	status: z.enum(INVOICE_STATUSES).optional(),
-	paidAmount: z.coerce.number().min(0).optional()
-});
-var querySchema$4 = paginationSchema.extend({
-	status: z.enum(INVOICE_STATUSES).optional().catch(void 0),
-	customerId: z.string().optional(),
-	overdueOnly: z.string().transform((value) => value === "true").catch(false)
-});
-function nextInvoiceNumber() {
-	return `INV-${invoices$1.reduce((highest, invoice) => {
-		const parsed = Number(invoice.invoiceNumber.replace(/\D/g, ""));
-		return Number.isFinite(parsed) && parsed > highest ? parsed : highest;
-	}, 3e3) + 1}`;
-}
-/**
-* To'lov holatiga qarab faktura statusini aniqlaydi.
-* Qo'lda qo'yilgan `draft`/`cancelled` holatlari saqlanadi.
-*/
-function resolveStatus(invoice) {
-	if (invoice.status === "draft" || invoice.status === "cancelled") return invoice.status;
-	if (invoice.paidAmount >= invoice.amount) return "paid";
-	return invoice.dueDate < todayISO() ? "overdue" : "sent";
-}
-/** To'lov tushganda moliyaga daromad yozuvi qo'shadi. */
-function recordPayment(invoice, amount) {
-	transactions$1.unshift({
-		id: nextId(),
-		title: `${invoice.customerName} · ${invoice.invoiceNumber}`,
-		category: "Savdo daromadi",
-		account: "Ipak Yo'li bank · UZS",
-		date: todayISO(),
-		amount,
-		type: "income"
-	});
-}
-var getInvoiceStats = (_req, res) => {
-	const response = {
-		success: true,
-		data: invoiceStats()
-	};
-	res.json(response);
-};
-var getInvoices = (req, res) => {
-	const query = querySchema$4.parse(req.query);
-	const search = query.search.toLowerCase();
-	const filtered = active(invoices$1).map((invoice) => {
-		invoice.status = resolveStatus(invoice);
-		return invoice;
-	}).filter((invoice) => {
-		if (search && !invoice.invoiceNumber.toLowerCase().includes(search) && !invoice.customerName.toLowerCase().includes(search) && !invoice.orderNumber.toLowerCase().includes(search)) return false;
-		if (query.status && invoice.status !== query.status) return false;
-		if (query.customerId && invoice.customerId !== query.customerId) return false;
-		if (query.overdueOnly && !isOverdueInvoice(invoice)) return false;
-		return true;
-	}).sort((a, b) => b.issueDate.localeCompare(a.issueDate));
-	res.json(paginate(filtered, query.page, query.limit));
-};
-var createInvoice = (req, res) => {
-	const parsed = invoiceSchema.safeParse(req.body);
-	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const customer = customers$1.find((c) => c.id === parsed.data.customerId);
-	if (!customer) return sendNotFound(res, "Mijoz topilmadi");
-	const order = parsed.data.orderId ? orders$1.find((o) => o.id === parsed.data.orderId) : null;
-	if (parsed.data.orderId && !order) return sendNotFound(res, "Buyurtma topilmadi");
-	const newInvoice = {
-		id: nextId(),
-		invoiceNumber: nextInvoiceNumber(),
-		orderId: order?.id ?? null,
-		orderNumber: order?.orderNumber ?? "—",
-		customerId: customer.id,
-		customerName: customer.name,
-		amount: parsed.data.amount,
-		paidAmount: parsed.data.paidAmount ?? 0,
-		status: parsed.data.status ?? "sent",
-		issueDate: todayISO(),
-		dueDate: parsed.data.dueDate,
-		note: parsed.data.note
-	};
-	newInvoice.status = resolveStatus(newInvoice);
-	invoices$1.unshift(newInvoice);
-	if (newInvoice.paidAmount > 0) recordPayment(newInvoice, newInvoice.paidAmount);
-	logActivity({
-		action: "Hisob-faktura chiqarildi",
-		details: `${newInvoice.invoiceNumber} · ${newInvoice.customerName}`,
-		icon: "FileText"
-	});
-	const response = {
-		success: true,
-		data: newInvoice,
-		message: "Hisob-faktura yaratildi"
-	};
-	res.status(201).json(response);
-};
-var updateInvoice = (req, res) => {
-	const parsed = invoiceSchema.partial().safeParse(req.body);
-	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const invoice = invoices$1.find((i) => i.id === paramId(req) && !i.deletedAt);
-	if (!invoice) return sendNotFound(res, "Hisob-faktura topilmadi");
-	const previousPaid = invoice.paidAmount;
-	if (parsed.data.customerId) {
-		const customer = customers$1.find((c) => c.id === parsed.data.customerId);
-		if (!customer) return sendNotFound(res, "Mijoz topilmadi");
-		invoice.customerId = customer.id;
-		invoice.customerName = customer.name;
-	}
-	if (parsed.data.amount !== void 0) invoice.amount = parsed.data.amount;
-	if (parsed.data.dueDate) invoice.dueDate = parsed.data.dueDate;
-	if (parsed.data.note !== void 0) invoice.note = parsed.data.note;
-	if (parsed.data.status) invoice.status = parsed.data.status;
-	if (parsed.data.paidAmount !== void 0) invoice.paidAmount = Math.min(parsed.data.paidAmount, invoice.amount);
-	invoice.status = resolveStatus(invoice);
-	const delta = invoice.paidAmount - previousPaid;
-	if (delta > 0) recordPayment(invoice, delta);
-	logActivity({
-		action: invoice.status === "paid" ? "Faktura to'landi" : "Faktura yangilandi",
-		details: `${invoice.invoiceNumber} · ${invoice.customerName}`,
-		icon: invoice.status === "paid" ? "CircleCheck" : "PenLine"
-	});
-	const response = {
-		success: true,
-		data: invoice,
-		message: "Hisob-faktura yangilandi"
-	};
-	res.json(response);
-};
-var paymentSchema$1 = z.object({ amount: z.coerce.number().positive("to'lov summasi noldan katta bo'lishi kerak") });
-/** Faktura bo'yicha to'lov qayd etish — qisman to'lovlar ham qo'llab-quvvatlanadi. */
-var recordInvoicePayment = (req, res) => {
-	const parsed = paymentSchema$1.safeParse(req.body);
-	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const invoice = invoices$1.find((i) => i.id === paramId(req) && !i.deletedAt);
-	if (!invoice) return sendNotFound(res, "Hisob-faktura topilmadi");
-	const remaining = invoice.amount - invoice.paidAmount;
-	if (remaining <= 0) return res.status(409).json({
-		success: false,
-		message: "Bu faktura allaqachon to'liq to'langan"
-	});
-	const applied = Math.min(parsed.data.amount, remaining);
-	invoice.paidAmount += applied;
-	invoice.status = resolveStatus(invoice);
-	recordPayment(invoice, applied);
-	logActivity({
-		action: "Faktura bo'yicha to'lov qabul qilindi",
-		details: `${invoice.invoiceNumber} · ${applied.toLocaleString("uz-UZ")} so'm`,
-		icon: "CircleCheck"
-	});
-	const response = {
-		success: true,
-		data: invoice,
-		message: applied < parsed.data.amount ? `Qoldiq ${applied.toLocaleString("uz-UZ")} so'm edi — shu summa qabul qilindi` : "To'lov qabul qilindi"
-	};
-	res.json(response);
-};
-var deleteInvoice = (req, res) => {
-	const removed = softRemove(invoices$1, paramId(req));
-	if (!removed) return sendNotFound(res, "Hisob-faktura topilmadi");
-	logActivity({
-		action: "Hisob-faktura o'chirildi",
-		details: removed.invoiceNumber,
-		icon: "Trash2"
-	});
-	res.json({
-		success: true,
-		data: null,
-		message: "Hisob-faktura o'chirildi"
 	});
 };
 //#endregion
@@ -5161,35 +5116,152 @@ var changePasswordSchema = z.object({
 	newPassword: passwordSchema$1
 });
 var login = (req, res) => {
-	const parsed = loginSchema.safeParse(req.body);
-	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const user = users$1.find((item) => item.login && item.login.toLowerCase() === parsed.data.login.trim().toLowerCase() && !item.deletedAt);
-	if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) return res.status(401).json({
-		success: false,
-		message: "Login yoki parol noto'g'ri"
-	});
-	if (user.status === "suspended") return res.status(403).json({
-		success: false,
-		message: "Hisobingiz to'xtatilgan. Administratorga murojaat qiling."
-	});
-	user.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
-	const token = createSession(user.id);
-	recordAudit({
-		user,
-		action: "login",
-		entity: "auth",
-		summary: `${user.name} tizimga kirdi`,
-		ip: clientIp(req)
-	});
-	const response = {
-		success: true,
-		data: {
-			token,
-			user: toPublicUser(user)
-		},
-		message: "Tizimga muvaffaqiyatli kirdingiz"
-	};
-	res.json(response);
+	try {
+		console.log("📨 Login request received");
+		console.log("📦 Request body:", req.body ? "exists" : "undefined/null");
+		console.log("🔍 Body type:", typeof req.body);
+		if (!req.body || typeof req.body !== "object") {
+			console.error("❌ Invalid request body:", req.body);
+			return res.status(400).json({
+				success: false,
+				message: "Yaroqsiz so'rov: body bo'sh yoki noto'g'ri formatda"
+			});
+		}
+		const parsed = loginSchema.safeParse(req.body);
+		if (!parsed.success) {
+			console.error("❌ Login validation error:", parsed.error.errors);
+			return sendValidationError(res, parsed.error);
+		}
+		const loginValue = parsed.data.login.trim().toLowerCase();
+		console.log("🔍 Login attempt for:", loginValue);
+		console.log("📊 Total users in database:", users$1?.length || 0);
+		if (!users$1 || !Array.isArray(users$1)) {
+			console.error("❌ CRITICAL: users array undefined or not array!");
+			return res.status(500).json({
+				success: false,
+				message: "Server xatosi: Ma'lumotlar bazasi mavjud emas"
+			});
+		}
+		const user = users$1.find((item) => {
+			try {
+				const loginMatch = item.login && item.login.toLowerCase() === loginValue;
+				const emailMatch = item.email && item.email.toLowerCase() === loginValue;
+				const notDeleted = !item.deletedAt;
+				return (loginMatch || emailMatch) && notDeleted;
+			} catch (findError) {
+				console.error("❌ Error in find predicate:", findError);
+				return false;
+			}
+		});
+		if (!user) {
+			console.error("❌ User not found:", loginValue);
+			console.error("📋 Available users:", users$1.slice(0, 5).map((u) => ({
+				login: u.login,
+				email: u.email,
+				hasPassword: !!u.passwordHash
+			})));
+			return res.status(401).json({
+				success: false,
+				message: "Login yoki parol noto'g'ri"
+			});
+		}
+		console.log("✅ User found:", {
+			id: user.id,
+			login: user.login,
+			email: user.email,
+			hasPassword: !!user.passwordHash,
+			status: user.status
+		});
+		if (!user.passwordHash) {
+			console.error("❌ User has no password hash:", user.login);
+			return res.status(500).json({
+				success: false,
+				message: "Server xatosi: Parol hash mavjud emas"
+			});
+		}
+		let passwordValid = false;
+		try {
+			passwordValid = verifyPassword(parsed.data.password, user.passwordHash);
+			console.log("🔐 Password verification result:", passwordValid);
+		} catch (verifyError) {
+			console.error("❌ Password verification error:", verifyError);
+			return res.status(500).json({
+				success: false,
+				message: "Server xatosi: Parol tekshirishda xatolik"
+			});
+		}
+		if (!passwordValid) {
+			console.error("❌ Invalid password for user:", user.login);
+			return res.status(401).json({
+				success: false,
+				message: "Login yoki parol noto'g'ri"
+			});
+		}
+		if (user.status === "suspended") {
+			console.warn("⚠️ User suspended:", user.email);
+			return res.status(403).json({
+				success: false,
+				message: "Hisobingiz to'xtatilgan. Administratorga murojaat qiling."
+			});
+		}
+		let token;
+		try {
+			user.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
+			token = createAccessToken({
+				userId: user.id,
+				email: user.email,
+				role: user.role
+			});
+			console.log("✅ JWT token created:", {
+				userId: user.id,
+				email: user.email,
+				role: user.role,
+				tokenPrefix: token.substring(0, 20) + "..."
+			});
+		} catch (tokenError) {
+			console.error("❌ Token creation error:", tokenError);
+			return res.status(500).json({
+				success: false,
+				message: "Server xatosi: Token yaratishda xatolik"
+			});
+		}
+		try {
+			recordAudit({
+				user,
+				action: "login",
+				entity: "auth",
+				summary: `${user.name} tizimga kirdi`,
+				ip: clientIp(req)
+			});
+		} catch (auditError) {
+			console.error("⚠️ Audit logging error (non-critical):", auditError);
+		}
+		const response = {
+			success: true,
+			data: {
+				token,
+				user: toPublicUser(user)
+			},
+			message: "Tizimga muvaffaqiyatli kirdingiz"
+		};
+		console.log("✅ Login successful for:", user.email);
+		res.json(response);
+	} catch (error) {
+		console.error("❌❌❌ LOGIN EXCEPTION (UNCAUGHT) ❌❌❌");
+		console.error("Error type:", error?.constructor?.name);
+		console.error("Error message:", error instanceof Error ? error.message : "Unknown");
+		console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+		console.error("Request details:", {
+			body: req.body,
+			headers: req.headers,
+			url: req.url,
+			method: req.method
+		});
+		res.status(500).json({
+			success: false,
+			message: "Server xatosi: " + (error instanceof Error ? error.message : "Noma'lum xatolik")
+		});
+	}
 };
 var logout = (req, res) => {
 	const token = extractToken(req.headers.authorization);
@@ -5202,11 +5274,35 @@ var logout = (req, res) => {
 };
 /** Joriy sessiya egasi — sahifa yangilanganda holatni tiklash uchun. */
 var getCurrentUser = (req, res) => {
-	const user = req.currentUser;
-	if (!user) return res.status(401).json({
-		success: false,
-		message: "Sessiya topilmadi"
-	});
+	console.log("👤 getCurrentUser called");
+	const token = extractToken(req.headers.authorization);
+	console.log("   Token:", token ? "present" : "missing");
+	if (!token) {
+		console.error("   ❌ No token");
+		return res.status(401).json({
+			success: false,
+			message: "Token topilmadi"
+		});
+	}
+	const payload = verifyAccessToken(token);
+	console.log("   JWT payload:", payload ? `userId=${payload.userId}` : "null");
+	if (!payload) {
+		console.error("   ❌ Invalid JWT");
+		return res.status(401).json({
+			success: false,
+			message: "Token yaroqsiz"
+		});
+	}
+	const user = users$1.find((item) => item.id === payload.userId && !item.deletedAt);
+	console.log("   User found:", user ? user.email : "null");
+	if (!user) {
+		console.error("   ❌ User not found");
+		return res.status(401).json({
+			success: false,
+			message: "Foydalanuvchi topilmadi"
+		});
+	}
+	console.log("   ✅ getCurrentUser success:", user.email);
 	const response = {
 		success: true,
 		data: toPublicUser(user)
@@ -5240,23 +5336,41 @@ var changePassword = (req, res) => {
 };
 /**
 * Sessiyani tekshiruvchi middleware.
-* Token yaroqli bo'lsa foydalanuvchini `req.currentUser` ga qo'yadi.
+* JWT token'ni verify qiladi (stateless - Vercel serverless uchun).
 */
 var requireAuth = (req, res, next) => {
+	console.log("🔐 requireAuth middleware called");
+	console.log("   URL:", req.url);
+	console.log("   Method:", req.method);
+	console.log("   Authorization header:", req.headers.authorization ? "present" : "missing");
 	const token = extractToken(req.headers.authorization);
-	const userId = token ? resolveSession(token) : null;
-	if (!userId) return res.status(401).json({
-		success: false,
-		message: "Avtorizatsiya talab qilinadi"
-	});
-	const user = users$1.find((item) => item.id === userId && !item.deletedAt);
+	console.log("   Token extracted:", token ? `${token.substring(0, 20)}...` : "null");
+	if (!token) {
+		console.error("❌ requireAuth failed: No token");
+		return res.status(401).json({
+			success: false,
+			message: "Avtorizatsiya talab qilinadi"
+		});
+	}
+	const payload = verifyAccessToken(token);
+	console.log("   JWT payload:", payload ? `userId=${payload.userId}` : "null (invalid token)");
+	if (!payload) {
+		console.error("❌ requireAuth failed: Invalid JWT token");
+		return res.status(401).json({
+			success: false,
+			message: "Token yaroqsiz yoki muddati o'tgan"
+		});
+	}
+	const user = users$1.find((item) => item.id === payload.userId && !item.deletedAt);
+	console.log("   User found in memory:", user ? user.email : "null");
 	if (!user || user.status === "suspended") {
-		if (token) destroySession(token);
+		console.error("❌ requireAuth failed: User not found or suspended");
 		return res.status(401).json({
 			success: false,
 			message: "Hisob mavjud emas yoki to'xtatilgan"
 		});
 	}
+	console.log("✅ requireAuth success:", user.email);
 	req.currentUser = user;
 	next();
 };
@@ -6421,7 +6535,6 @@ function createServer() {
 	app.use("/api/crm", requireModule("crm"));
 	app.use("/api/orders", requireModule("crm"));
 	app.use("/api/customers", requireModule("crm"));
-	app.use("/api/invoices", requireModule("crm"));
 	app.use("/api/debts", requireModule("crm"));
 	app.use("/api/reports", requireModule("reports"));
 	app.use("/api/users", requireModule("users"));
@@ -6468,6 +6581,7 @@ function createServer() {
 	app.get("/api/suppliers/:id", getSupplierDetail);
 	app.post("/api/suppliers", createSupplier);
 	app.put("/api/suppliers/:id", updateSupplier);
+	app.patch("/api/suppliers/:id/restore", restoreSupplier);
 	app.delete("/api/suppliers/:id", deleteSupplier);
 	app.use("/api/branches", requireModule("dashboard"));
 	app.get("/api/branches/stats", getBranchStats);
@@ -6494,12 +6608,6 @@ function createServer() {
 	app.post("/api/purchases", createPurchase);
 	app.put("/api/purchases/:id", updatePurchase);
 	app.delete("/api/purchases/:id", deletePurchase);
-	app.get("/api/invoices/stats", getInvoiceStats);
-	app.get("/api/invoices", getInvoices);
-	app.post("/api/invoices", createInvoice);
-	app.post("/api/invoices/:id/payment", recordInvoicePayment);
-	app.put("/api/invoices/:id", updateInvoice);
-	app.delete("/api/invoices/:id", deleteInvoice);
 	app.get("/api/debts/stats", getDebtStats);
 	app.get("/api/debts/customers", getCustomerDebts);
 	app.get("/api/debts/customers/:customerId/history", getCustomerDebtHistory);
@@ -6545,9 +6653,16 @@ function createServer() {
 			url: req.originalUrl,
 			body: req.body
 		});
+		console.error("❌ SERVER ERROR:", {
+			message: error.message,
+			stack: error.stack,
+			url: req.originalUrl,
+			method: req.method
+		});
 		return res.status(error.status || 500).json({
 			success: false,
-			message: "Ichki server xatosi. Iltimos, keyinroq urinib ko'ring."
+			message: "Ichki server xatosi. Iltimos, keyinroq urinib ko'ring.",
+			error: error.message
 		});
 	};
 	app.use(errorHandler);
