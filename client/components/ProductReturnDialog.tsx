@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PackageX } from "lucide-react";
 import { Product, Supplier } from "@shared/api";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface ProductReturnDialogProps {
   onOpenChange: (open: boolean) => void;
   supplier: Supplier | null;
   products: Product[];
+  defaultProductId?: string | null; // Auto-select mahsulot
   onSubmit: (data: {
     productId: string;
     quantity: number;
@@ -48,6 +49,7 @@ export function ProductReturnDialog({
   onOpenChange,
   supplier,
   products,
+  defaultProductId,
   onSubmit,
 }: ProductReturnDialogProps) {
   const [productId, setProductId] = useState("");
@@ -55,6 +57,19 @@ export function ProductReturnDialog({
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-select mahsulot when dialog opens with defaultProductId
+  useEffect(() => {
+    if (open && defaultProductId) {
+      setProductId(defaultProductId);
+    } else if (!open) {
+      // Reset form when dialog closes
+      setProductId("");
+      setQuantity("1");
+      setReason("");
+      setNote("");
+    }
+  }, [open, defaultProductId]);
 
   // Ta'minotchiga tegishli mahsulotlar
   const supplierProducts = supplier

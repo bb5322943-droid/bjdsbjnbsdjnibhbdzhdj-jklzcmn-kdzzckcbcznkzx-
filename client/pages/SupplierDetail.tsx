@@ -118,6 +118,7 @@ export default function SupplierDetail() {
   const [dateFilter, setDateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<SupplierProduct | null>(null);
 
   // API hooks
   const { data: detailData, isLoading: detailLoading } = useSupplierDetail(id!);
@@ -536,6 +537,7 @@ export default function SupplierDetail() {
                     <TableHead className="text-right">Ombor qoldig'i</TableHead>
                     <TableHead className="text-right">Oxirgi narx</TableHead>
                     <TableHead>Oxirgi yetkazilgan</TableHead>
+                    <TableHead className="text-right">Amallar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -555,6 +557,20 @@ export default function SupplierDetail() {
                       </TableCell>
                       <TableCell>
                         {product.lastDeliveryDate || "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setShowReturnDialog(true);
+                          }}
+                          disabled={product.quantity === 0}
+                        >
+                          <PackageX className="mr-2 h-4 w-4" />
+                          Qaytarish
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -724,9 +740,13 @@ export default function SupplierDetail() {
       {supplier && (
         <ProductReturnDialog
           open={showReturnDialog}
-          onOpenChange={setShowReturnDialog}
+          onOpenChange={(open) => {
+            setShowReturnDialog(open);
+            if (!open) setSelectedProduct(null); // Reset selected product when closing
+          }}
           supplier={supplier}
           products={products}
+          defaultProductId={selectedProduct?.id}
           onSubmit={handleProductReturn}
         />
       )}
