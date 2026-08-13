@@ -25,7 +25,6 @@ import {
   ViewMode,
   ViewToggle,
 } from "@/components/PageKit";
-import { applyQuantityCache, setCachedQuantity } from "@/utils/product-cache";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
@@ -111,7 +110,7 @@ export default function Suppliers() {
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
   const categories = categoriesData?.data ?? [];
-  const products = applyQuantityCache(productsData?.data ?? []);
+  const products = productsData?.data ?? [];
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -151,9 +150,6 @@ export default function Suppliers() {
       }
 
       const newQuantity = product.quantity - data.quantity;
-
-      // Save to localStorage cache immediately
-      setCachedQuantity(data.productId, newQuantity);
 
       // Optimistic update: immediately update product quantity in cache
       const supplierProductsKey = ['supplier-products', returningProduct.id];

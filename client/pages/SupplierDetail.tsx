@@ -18,7 +18,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { applyQuantityCache, setCachedQuantity } from "@/utils/product-cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -138,7 +137,7 @@ export default function SupplierDetail() {
     returnsCount: 0,
   };
   const purchases = purchasesData?.data || [];
-  const products = applyQuantityCache(productsData?.data || []);
+  const products = productsData?.data || [];
   const returns = returnsData?.data || [];
   const financial = financialData?.data || { summary: { totalPaid: 0, currentDebt: 0 }, history: [] };
 
@@ -157,9 +156,6 @@ export default function SupplierDetail() {
       }
 
       const newQuantity = product.quantity - data.quantity;
-
-      // Save to localStorage cache immediately
-      setCachedQuantity(data.productId, newQuantity);
 
       // Optimistic update: immediately update UI
       queryClient.setQueryData(
