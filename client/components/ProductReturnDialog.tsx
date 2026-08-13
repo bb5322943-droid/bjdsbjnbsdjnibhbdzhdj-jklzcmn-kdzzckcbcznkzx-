@@ -26,7 +26,7 @@ interface ProductReturnDialogProps {
   onOpenChange: (open: boolean) => void;
   supplier: Supplier | null;
   products: Product[];
-  defaultProductId?: string | null; // Auto-select mahsulot
+  defaultProductId?: string | null;
   onSubmit: (data: {
     productId: string;
     quantity: number;
@@ -61,6 +61,7 @@ export function ProductReturnDialog({
 
   // Auto-select mahsulot when dialog opens with defaultProductId
   useEffect(() => {
+    console.log('🔄 [ProductReturnDialog] useEffect triggered:', { open, defaultProductId });
     if (open && defaultProductId) {
       setProductId(defaultProductId);
       setError("");
@@ -93,6 +94,7 @@ export function ProductReturnDialog({
       quantity,
       reason,
       note,
+      supplierProducts: supplierProducts.length,
     });
 
     // Validation
@@ -166,6 +168,15 @@ export function ProductReturnDialog({
   };
 
   const isFormValid = productId && reason && !isSubmitting;
+  
+  console.log('🔍 [ProductReturnDialog] Render:', {
+    open,
+    productId,
+    reason,
+    isFormValid,
+    isSubmitting,
+    supplierProductsCount: supplierProducts.length,
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -300,7 +311,10 @@ export function ProductReturnDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleOpenChange(false)}
+                onClick={() => {
+                  console.log('🚫 [ProductReturnDialog] Cancel clicked');
+                  handleOpenChange(false);
+                }}
                 disabled={isSubmitting}
               >
                 Bekor qilish
@@ -309,133 +323,7 @@ export function ProductReturnDialog({
                 type="submit"
                 disabled={!isFormValid}
                 className="bg-[#cb8535] hover:bg-[#b5761f]"
-              >
-                {isSubmitting ? "Qaytarilmoqda..." : "Qaytarish"}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PackageX className="text-[#cb8535]" size={20} />
-            Mahsulotni qaytarish
-          </DialogTitle>
-          <DialogDescription>
-            {supplier ? (
-              <>
-                <b>{supplier.name}</b> ta'minotchiga mahsulot qaytaring. Ombor
-                hisobidan mahsulot ayiriladi.
-              </>
-            ) : (
-              "Ta'minotchi tanlanmagan"
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        {supplierProducts.length === 0 ? (
-          <div className="py-8 text-center">
-            <PackageX size={48} className="mx-auto text-slate-300" />
-            <p className="mt-4 text-sm text-slate-500">
-              Ushbu ta'minotchidan hech qanday mahsulot topilmadi yoki barcha
-              mahsulotlar tugagan.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Mahsulot tanlash */}
-            <div className="space-y-2">
-              <Label htmlFor="product">
-                Mahsulot <span className="text-red-500">*</span>
-              </Label>
-              <Select value={productId} onValueChange={setProductId} required>
-                <SelectTrigger id="product">
-                  <SelectValue placeholder="Mahsulotni tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {supplierProducts.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name} (Mavjud: {product.quantity} ta)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Soni */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                Soni <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                max={maxQuantity}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="Qaytariladigan mahsulot soni"
-                required
-                disabled={!productId}
-              />
-              {selectedProduct && (
-                <p className="text-xs text-slate-400">
-                  Maksimal: {maxQuantity} ta
-                </p>
-              )}
-            </div>
-
-            {/* Qaytarish sababi */}
-            <div className="space-y-2">
-              <Label htmlFor="reason">
-                Qaytarish sababi <span className="text-red-500">*</span>
-              </Label>
-              <Select value={reason} onValueChange={setReason} required>
-                <SelectTrigger id="reason">
-                  <SelectValue placeholder="Sababni tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RETURN_REASONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {r.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Izoh */}
-            <div className="space-y-2">
-              <Label htmlFor="note">Qo'shimcha izoh</Label>
-              <Textarea
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Qaytarish haqida batafsil ma'lumot..."
-                rows={3}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Bekor qilish
-              </Button>
-              <Button
-                type="submit"
-                disabled={!productId || !reason || isSubmitting}
-                className="bg-[#cb8535] hover:bg-[#b5761f]"
+                onClick={() => console.log('🖱️ [ProductReturnDialog] Submit button clicked')}
               >
                 {isSubmitting ? "Qaytarilmoqda..." : "Qaytarish"}
               </Button>
