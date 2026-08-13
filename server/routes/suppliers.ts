@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { z } from "zod";
 import { ApiResponse, Supplier, SupplierStats } from "@shared/api";
-import { active, logActivity, nextId, products, softRemove, suppliers, purchases } from "../data/store";
+import { active, logActivity, nextId, products, softRemove, suppliers, purchases, persist } from "../data/store";
 import { supplierStats } from "../data/metrics";
 import {
   paginate,
@@ -443,6 +443,15 @@ export const returnProductToSupplier: RequestHandler = (req, res) => {
 
   // Mahsulot miqdorini kamaytirish
   product.quantity -= quantity;
+
+  // CRITICAL: Immediately persist to database to ensure changes are saved
+  // This is especially important for Vercel serverless where /tmp is ephemeral
+  try {
+    persist();
+  } catch (persistError) {
+    console.error("❌ Failed to persist product return:", persistError);
+    // Still return success since the in-memory change was made
+  }
 
   // Log activity without req.user (not available in all contexts)
   // logActivity will be called when auth middleware is properly set up

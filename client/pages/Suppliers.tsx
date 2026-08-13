@@ -142,6 +142,23 @@ export default function Suppliers() {
     if (!returningProduct) return;
     
     try {
+      // Optimistic update: immediately update product quantity in cache
+      const supplierProductsKey = ['supplier-products', returningProduct.id];
+      queryClient.setQueryData(
+        supplierProductsKey,
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((p: any) =>
+              p.id === data.productId
+                ? { ...p, quantity: p.quantity - data.quantity }
+                : p
+            ),
+          };
+        }
+      );
+
       await returnProductMutation.mutateAsync({
         id: returningProduct.id,
         ...data,
@@ -169,6 +186,11 @@ export default function Suppliers() {
       
       setReturningProduct(null);
     } catch (error) {
+      // Revert optimistic update on error
+      if (returningProduct) {
+        queryClient.invalidateQueries({ queryKey: ['supplier-products', returningProduct.id] });
+      }
+      
       toast.error("Xatolik yuz berdi", {
         description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
       });
