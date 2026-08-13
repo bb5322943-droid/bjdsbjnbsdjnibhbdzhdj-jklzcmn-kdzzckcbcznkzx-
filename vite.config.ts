@@ -17,14 +17,18 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist/spa",
     rollupOptions: {
       output: {
-        // Force new hash on every build to bypass CDN cache
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`
+        // Use content hash only - simpler and more reliable
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/[name]-[hash].js`,
+        assetFileNames: `assets/[name]-[hash].[ext]`
       }
     }
   },
-  plugins: [react(), expressPlugin()],
+  plugins: [
+    react(), 
+    htmlCacheBust(),
+    expressPlugin()
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./client"),
@@ -32,6 +36,20 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
+
+// Plugin to add cache-busting meta tag to HTML
+function htmlCacheBust(): Plugin {
+  return {
+    name: 'html-cache-bust',
+    transformIndexHtml(html) {
+      const buildTime = Date.now();
+      return html.replace(
+        '</head>',
+        `  <meta name="build-time" content="${buildTime}">\n  </head>`
+      );
+    },
+  };
+}
 
 function expressPlugin(): Plugin {
   return {
