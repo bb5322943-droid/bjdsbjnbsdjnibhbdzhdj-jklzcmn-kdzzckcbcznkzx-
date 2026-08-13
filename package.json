@@ -1,6 +1,6 @@
 {
   "name": "fusion-erp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Full-featured ERP system for small and medium businesses",
   "private": true,
   "type": "module",
