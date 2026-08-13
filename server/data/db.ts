@@ -241,6 +241,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_refunds_number ON refunds(refundNumber);
 CREATE INDEX IF NOT EXISTS idx_refunds_original_sale ON refunds(originalSaleId);
 CREATE INDEX IF NOT EXISTS idx_refunds_date ON refunds(refundDate);
 
+-- Supplier returns module tables
+CREATE TABLE IF NOT EXISTS supplier_returns (
+  id TEXT PRIMARY KEY, returnNumber TEXT NOT NULL, supplierId TEXT NOT NULL,
+  supplierName TEXT NOT NULL, productId TEXT NOT NULL, productName TEXT NOT NULL,
+  quantity INTEGER NOT NULL, reason TEXT NOT NULL, reasonText TEXT,
+  amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  returnDate TEXT NOT NULL, purchaseNumber TEXT, createdAt TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_returns_number ON supplier_returns(returnNumber);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_supplier ON supplier_returns(supplierId);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_product ON supplier_returns(productId);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_date ON supplier_returns(returnDate);
+
 -- Posts module tables
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL,
@@ -548,6 +561,22 @@ const BASE_TABLES = {
     "refundDate",
     "paymentMethod",
     "status",
+  ],
+  supplier_returns: [
+    "id",
+    "returnNumber",
+    "supplierId",
+    "supplierName",
+    "productId",
+    "productName",
+    "quantity",
+    "reason",
+    "reasonText",
+    "amount",
+    "status",
+    "returnDate",
+    "purchaseNumber",
+    "createdAt",
   ],
 } as const;
 

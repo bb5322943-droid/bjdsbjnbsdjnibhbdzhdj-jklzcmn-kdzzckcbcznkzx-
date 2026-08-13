@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { z } from "zod";
 import { ApiResponse, Supplier, SupplierStats } from "@shared/api";
-import { active, logActivity, nextId, products, softRemove, suppliers, purchases, persist } from "../data/store";
+import { active, logActivity, nextId, products, softRemove, suppliers, purchases, persist, supplierReturns } from "../data/store";
 import { supplierStats } from "../data/metrics";
 import {
   paginate,
@@ -277,9 +277,10 @@ export const getSupplierReturns: RequestHandler = (req, res) => {
   const supplier = suppliers.find((s) => s.id === req.params.id && !s.deletedAt);
   if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
 
-  // Mock data: Hozircha bo'sh ro'yxat qaytaramiz
-  // Keyinchalik returns table yaratilganda to'ldiriladi
-  const returns: any[] = [];
+  // Ushbu ta'minotchiga qaytarilgan mahsulotlar
+  const returns = supplierReturns.filter(
+    (r) => r.supplierId === supplier.id
+  );
 
   res.json({
     success: true,
@@ -421,9 +422,11 @@ export const returnProductToSupplier: RequestHandler = (req, res) => {
     });
   }
 
-  // Return record yaratish (mock data store'da saqlaymiz)
+  // Return record yaratish
+  const returnNumber = `RET-${nextId()}`;
   const returnRecord = {
     id: nextId(),
+    returnNumber,
     supplierId,
     supplierName: supplier.name,
     productId,
@@ -438,8 +441,8 @@ export const returnProductToSupplier: RequestHandler = (req, res) => {
     createdAt: new Date().toISOString(),
   };
 
-  // TODO: Agar real DB bo'lsa, bu yerda save qilinadi
-  // supplierReturns.push(returnRecord);
+  // Save to supplier_returns table
+  supplierReturns.unshift(returnRecord);
 
   // Mahsulot miqdorini kamaytirish
   product.quantity -= quantity;

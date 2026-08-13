@@ -88,6 +88,7 @@ export const activities: Activity[] = readTable<Activity>("activities");
 export const debtPayments: DebtPayment[] = readTable<DebtPayment>("debt_payments");
 export const sales: Sale[] = readTable<Sale>("sales");
 export const refunds: Refund[] = readTable<Refund>("refunds");
+export const supplierReturns: any[] = readTable<any>("supplier_returns");
 
 console.log("✅ Tables loaded successfully");
 console.log(`📊 Data counts: users=${users?.length || 0}, employees=${employees?.length || 0}, products=${products?.length || 0}`);
@@ -232,6 +233,7 @@ export function persist(): void {
   writeTable("debt_payments", debtPayments);
   writeTable("sales", sales);
   writeTable("refunds", refunds);
+  writeTable("supplier_returns", supplierReturns);
 }
 
 /** ID generatori — ketma-ket chaqiruvlarda takrorlanmasligi kafolatlanadi. */
