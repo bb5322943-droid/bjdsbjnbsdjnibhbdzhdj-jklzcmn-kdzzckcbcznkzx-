@@ -80,25 +80,72 @@ export function ProductReturnDialog({
 
   const selectedProduct = supplierProducts.find((p) => p.id === productId);
   const maxQuantity = selectedProduct?.quantity || 0;
+  
+  // Debug: Log form state
+  const isButtonDisabled = !productId || !reason || isSubmitting;
+  console.log('🔍 [ProductReturnDialog] Form state:', {
+    productId,
+    reason,
+    quantity,
+    isSubmitting,
+    isButtonDisabled,
+    maxQuantity,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productId || !reason) return;
+    
+    console.log('🔍 [ProductReturnDialog] handleSubmit called:', {
+      productId,
+      quantity,
+      reason,
+      note,
+      productIdValid: !!productId,
+      reasonValid: !!reason,
+    });
 
+    if (!productId) {
+      console.error('❌ [ProductReturnDialog] Product not selected');
+      return;
+    }
+    
+    if (!reason) {
+      console.error('❌ [ProductReturnDialog] Reason not selected');
+      return;
+    }
+
+    const parsedQuantity = parseInt(quantity);
+    if (!parsedQuantity || parsedQuantity < 1) {
+      console.error('❌ [ProductReturnDialog] Invalid quantity:', quantity);
+      return;
+    }
+
+    if (parsedQuantity > maxQuantity) {
+      console.error('❌ [ProductReturnDialog] Quantity exceeds max:', {
+        requested: parsedQuantity,
+        max: maxQuantity,
+      });
+      return;
+    }
+
+    console.log('✅ [ProductReturnDialog] Validation passed, calling onSubmit...');
     setIsSubmitting(true);
     try {
       await onSubmit({
         productId,
-        quantity: parseInt(quantity) || 1,
+        quantity: parsedQuantity,
         reason,
         note,
       });
+      console.log('✅ [ProductReturnDialog] onSubmit completed');
       // Reset form
       setProductId("");
       setQuantity("1");
       setReason("");
       setNote("");
       onOpenChange(false);
+    } catch (error) {
+      console.error('❌ [ProductReturnDialog] onSubmit error:', error);
     } finally {
       setIsSubmitting(false);
     }
