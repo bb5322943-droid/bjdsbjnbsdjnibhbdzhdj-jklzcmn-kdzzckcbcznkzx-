@@ -148,19 +148,60 @@ export default function SupplierDetail() {
     note: string;
   }) => {
     try {
+      console.log('🔍 [SupplierDetail] handleProductReturn START:', {
+        supplierId: id,
+        productId: data.productId,
+        quantity: data.quantity,
+        quantityType: typeof data.quantity,
+      });
+
       // Find the product to get current quantity
       const product = products.find(p => p.id === data.productId);
       if (!product) {
+        console.error('❌ [SupplierDetail] Product not found:', data.productId);
         toast.error("Mahsulot topilmadi");
         return;
       }
 
+      console.log('📦 [SupplierDetail] Current product state:', {
+        productId: product.id,
+        productName: product.name,
+        currentQuantity: product.quantity,
+        quantityType: typeof product.quantity,
+        returningQuantity: data.quantity,
+      });
+
+      // Validate quantity
+      if (data.quantity <= 0) {
+        console.error('❌ [SupplierDetail] Invalid quantity:', data.quantity);
+        toast.error("Miqdor 0 dan katta bo'lishi kerak");
+        return;
+      }
+
+      if (product.quantity < data.quantity) {
+        console.error('❌ [SupplierDetail] Insufficient stock:', {
+          available: product.quantity,
+          requested: data.quantity,
+        });
+        toast.error(`Omborda faqat ${product.quantity} ta mahsulot mavjud`);
+        return;
+      }
+
       const newQuantity = product.quantity - data.quantity;
+      console.log('✅ [SupplierDetail] Calculated new quantity:', {
+        oldQuantity: product.quantity,
+        returningQuantity: data.quantity,
+        newQuantity,
+      });
 
       // Optimistic update: immediately update UI
       queryClient.setQueryData(
         ['supplier-products', id],
         (old: any) => {
+          console.log('🔄 [SupplierDetail] Updating supplier-products cache:', {
+            hasOldData: !!old?.data,
+            oldDataLength: old?.data?.length,
+          });
           if (!old?.data) return old;
           return {
             ...old,
@@ -177,6 +218,10 @@ export default function SupplierDetail() {
       queryClient.setQueryData(
         ['products'],
         (old: any) => {
+          console.log('🔄 [SupplierDetail] Updating global products cache:', {
+            hasOldData: !!old?.data,
+            oldDataLength: old?.data?.length,
+          });
           if (!old?.data) return old;
           return {
             ...old,
@@ -189,22 +234,27 @@ export default function SupplierDetail() {
         }
       );
 
-      await returnMutation.mutateAsync({ id: id!, ...data });
+      console.log('📡 [SupplierDetail] Calling API mutation...');
+      const result = await returnMutation.mutateAsync({ id: id!, ...data });
+      console.log('✅ [SupplierDetail] API response:', result);
       
       toast.success("Mahsulot qaytarildi!", {
         description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi. Qolgan: ${newQuantity} ta`,
       });
       
-      // Mahsulotlar ro'yxatini yangilash
+      console.log('🔄 [SupplierDetail] Refetching products...');
       await refetchProducts();
       
       // Invalidate related queries to ensure consistency
+      console.log('🗑️ [SupplierDetail] Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       
+      console.log('✅ [SupplierDetail] handleProductReturn COMPLETE');
       setShowReturnDialog(false);
     } catch (error) {
+      console.error('❌ [SupplierDetail] handleProductReturn ERROR:', error);
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['supplier-products', id] });
       queryClient.invalidateQueries({ queryKey: ['products'] });

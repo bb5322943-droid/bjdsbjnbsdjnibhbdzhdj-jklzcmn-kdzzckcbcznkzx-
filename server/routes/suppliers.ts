@@ -401,21 +401,57 @@ const returnProductSchema = z.object({
 
 export const returnProductToSupplier: RequestHandler = (req, res) => {
   const supplierId = req.params.id;
+  
+  console.log('🔍 [Backend] returnProductToSupplier START:', {
+    supplierId,
+    body: req.body,
+    bodyType: typeof req.body,
+  });
+
   const supplier = suppliers.find((s) => s.id === supplierId && !s.deletedAt);
   
-  if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+  if (!supplier) {
+    console.error('❌ [Backend] Supplier not found:', supplierId);
+    return sendNotFound(res, "Ta'minotchi topilmadi");
+  }
 
   const parsed = returnProductSchema.safeParse(req.body);
-  if (!parsed.success) return sendValidationError(res, parsed.error);
+  if (!parsed.success) {
+    console.error('❌ [Backend] Validation failed:', parsed.error);
+    return sendValidationError(res, parsed.error);
+  }
 
   const { productId, quantity, reason, note } = parsed.data;
+  
+  console.log('✅ [Backend] Parsed data:', {
+    productId,
+    quantity,
+    quantityType: typeof quantity,
+    reason,
+    note,
+  });
 
   // Mahsulotni topish
   const product = products.find((p) => p.id === productId && !p.deletedAt);
-  if (!product) return sendNotFound(res, "Mahsulot topilmadi");
+  if (!product) {
+    console.error('❌ [Backend] Product not found:', productId);
+    return sendNotFound(res, "Mahsulot topilmadi");
+  }
+
+  console.log('📦 [Backend] Product found:', {
+    productId: product.id,
+    productName: product.name,
+    currentQuantity: product.quantity,
+    quantityType: typeof product.quantity,
+    returningQuantity: quantity,
+  });
 
   // Mahsulot omborda yetarli bo'lishi kerak
   if (product.quantity < quantity) {
+    console.error('❌ [Backend] Insufficient stock:', {
+      available: product.quantity,
+      requested: quantity,
+    });
     return res.status(400).json({
       success: false,
       message: `Omborda faqat ${product.quantity} ta mahsulot mavjud`,
@@ -443,18 +479,32 @@ export const returnProductToSupplier: RequestHandler = (req, res) => {
 
   // Save to supplier_returns table
   supplierReturns.unshift(returnRecord);
+  console.log('💾 [Backend] Return record saved:', returnNumber);
 
   // Mahsulot miqdorini kamaytirish
+  const oldQuantity = product.quantity;
   product.quantity -= quantity;
+  const newQuantity = product.quantity;
+  
+  console.log('✅ [Backend] Product quantity updated:', {
+    productId: product.id,
+    oldQuantity,
+    returningQuantity: quantity,
+    newQuantity,
+    calculation: `${oldQuantity} - ${quantity} = ${newQuantity}`,
+  });
 
   // CRITICAL: Immediately persist to database to ensure changes are saved
   // This is especially important for Vercel serverless where /tmp is ephemeral
   try {
     persist();
+    console.log('💾 [Backend] Data persisted to database');
   } catch (persistError) {
-    console.error("❌ Failed to persist product return:", persistError);
+    console.error("❌ [Backend] Failed to persist product return:", persistError);
     // Still return success since the in-memory change was made
   }
+
+  console.log('✅ [Backend] returnProductToSupplier COMPLETE');
 
   // Log activity without req.user (not available in all contexts)
   // logActivity will be called when auth middleware is properly set up
