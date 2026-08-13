@@ -172,6 +172,22 @@ export default function Suppliers() {
         }
       );
 
+      // Also update global products cache
+      queryClient.setQueryData(
+        ['products'],
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((p: any) =>
+              p.id === data.productId
+                ? { ...p, quantity: newQuantity }
+                : p
+            ),
+          };
+        }
+      );
+
       await returnProductMutation.mutateAsync({
         id: returningProduct.id,
         ...data,
@@ -194,7 +210,12 @@ export default function Suppliers() {
       );
       
       // Mahsulotlar ro'yxatini yangilash
-      refetch();
+      await refetch();
+      
+      // Invalidate related queries to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       
       setReturningProduct(null);
     } catch (error) {
@@ -202,6 +223,7 @@ export default function Suppliers() {
       if (returningProduct) {
         queryClient.invalidateQueries({ queryKey: ['supplier-products', returningProduct.id] });
       }
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       
       toast.error("Xatolik yuz berdi", {
         description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
