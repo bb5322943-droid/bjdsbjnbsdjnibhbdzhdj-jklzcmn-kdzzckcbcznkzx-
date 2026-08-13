@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { PackageX, Plus, RotateCcw, Star, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Supplier } from "@shared/api";
 import {
@@ -77,7 +76,6 @@ function Rating({ value }: { value: number }) {
 
 export default function Suppliers() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [status, setStatus] = useState(ALL);
@@ -153,39 +151,6 @@ export default function Suppliers() {
 
       const newQuantity = product.quantity - data.quantity;
 
-      // Optimistic update: immediately update product quantity in cache
-      const supplierProductsKey = ['supplier-products', returningProduct.id];
-      queryClient.setQueryData(
-        supplierProductsKey,
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((p: any) =>
-              p.id === data.productId
-                ? { ...p, quantity: newQuantity }
-                : p
-            ),
-          };
-        }
-      );
-
-      // Also update global products cache
-      queryClient.setQueryData(
-        ['products'],
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((p: any) =>
-              p.id === data.productId
-                ? { ...p, quantity: newQuantity }
-                : p
-            ),
-          };
-        }
-      );
-
       await returnProductMutation.mutateAsync({
         id: returningProduct.id,
         ...data,
@@ -210,19 +175,8 @@ export default function Suppliers() {
       // Mahsulotlar ro'yxatini yangilash
       await refetch();
       
-      // Invalidate related queries to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
-      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      
       setReturningProduct(null);
     } catch (error) {
-      // Revert optimistic update on error
-      if (returningProduct) {
-        queryClient.invalidateQueries({ queryKey: ['supplier-products', returningProduct.id] });
-      }
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      
       toast.error("Xatolik yuz berdi", {
         description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
       });

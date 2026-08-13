@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Building2,
@@ -113,7 +112,6 @@ function StatCard({
 export default function SupplierDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("purchases");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
@@ -196,47 +194,7 @@ export default function SupplierDetail() {
         newQuantity,
       });
 
-      // Optimistic update: immediately update UI
-      queryClient.setQueryData(
-        ['supplier-products', id],
-        (old: any) => {
-          console.log('🔄 [SupplierDetail] Updating supplier-products cache:', {
-            hasOldData: !!old?.data,
-            oldDataLength: old?.data?.length,
-          });
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((p: SupplierProduct) =>
-              p.id === data.productId
-                ? { ...p, quantity: newQuantity }
-                : p
-            ),
-          };
-        }
-      );
-
-      // Also update global products cache
-      queryClient.setQueryData(
-        ['products'],
-        (old: any) => {
-          console.log('🔄 [SupplierDetail] Updating global products cache:', {
-            hasOldData: !!old?.data,
-            oldDataLength: old?.data?.length,
-          });
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((p: any) =>
-              p.id === data.productId
-                ? { ...p, quantity: newQuantity }
-                : p
-            ),
-          };
-        }
-      );
-
-      console.log('📡 [SupplierDetail] Calling API mutation...');
+      console.log(' [SupplierDetail] Calling API mutation...');
       const result = await returnMutation.mutateAsync({ id: id!, ...data });
       console.log('✅ [SupplierDetail] API response:', result);
       
@@ -247,19 +205,10 @@ export default function SupplierDetail() {
       console.log('🔄 [SupplierDetail] Refetching products...');
       await refetchProducts();
       
-      // Invalidate related queries to ensure consistency
-      console.log('🗑️ [SupplierDetail] Invalidating queries...');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
-      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      
       console.log('✅ [SupplierDetail] handleProductReturn COMPLETE');
       setShowReturnDialog(false);
     } catch (error) {
       console.error('❌ [SupplierDetail] handleProductReturn ERROR:', error);
-      // Revert optimistic update on error
-      queryClient.invalidateQueries({ queryKey: ['supplier-products', id] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
       
       toast.error("Xatolik yuz berdi", {
         description: error instanceof Error ? error.message : "Mahsulotni qaytarishda muammo yuz berdi",
