@@ -125,7 +125,7 @@ import {
   updateUser,
 } from "./routes/users";
 import { exportReport, getReportSummary } from "./routes/reports";
-import { persist } from "./data/store";
+import { persist, ensureStoreReady, reloadStore } from "./data/store";
 import { purgeExpiredSessions } from "./lib/auth";
 import {
   changePassword,
@@ -222,9 +222,12 @@ function validateEnvironment(): void {
 export function createServer() {
   // Environment variables validatsiyasi
   validateEnvironment();
-  
-  // Muddati o'tgan sessiyalar bazada to'planib qolmasin.
-  purgeExpiredSessions();
+
+  // Muddati o'tgan sessiyalar bazada to'planib qolmasin (fon vazifasi —
+  // server ishga tushishini kutib turmaydi).
+  purgeExpiredSessions().catch((error) =>
+    logger.error("Muddati o'tgan sessiyalarni tozalashda xatolik:", error),
+  );
 
   // Avtomatik backup tizimini ishga tushirish
   startBackupScheduler();
@@ -272,6 +275,22 @@ export function createServer() {
       credentials: true,
     })
   );
+
+  /**
+   * Ma'lumotlar ombori tayyor ekanini kafolatlaydi va (PostgreSQL rejimida)
+   * har bir so'rov boshida boshqa serverless instance'lar yozgan eng so'nggi
+   * holatni qayta yuklaydi. Vercel'da har bir konteynerning o'z vaqtinchalik
+   * xotirasi bor va ular bir-birining yozganini avtomatik ko'rmaydi — shu
+   * sabab masalan mahsulot qoldig'i turli so'rovlarda turlicha ko'rinardi.
+   * Mahalliy SQLite rejimida `reloadStore` hech narsa qilmaydi (keraksiz).
+   * CORS'dan keyin turadi — shu tufayli xatolik javobi ham to'g'ri header bilan boradi.
+   */
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    ensureStoreReady()
+      .then(() => reloadStore())
+      .then(() => next())
+      .catch((error) => next(error));
+  });
 
   // Rate limiting - brute force hujumlardan himoya
   const limiter = rateLimit({
@@ -363,22 +382,58 @@ export function createServer() {
   });
 
   /**
-   * Ma'lumotni o'zgartirgan har bir muvaffaqiyatli so'rovdan keyin holat bazaga yoziladi.
-   * Javob yuborilgach ishga tushadi — foydalanuvchi saqlashni kutib turmaydi.
-   * Bitta joyda turgani uchun hech bir route uni chaqirishni unutib qo'ymaydi.
+   * Ma'lumotni o'zgartiradigan har bir muvaffaqiyatli so'rovdan keyin holat
+   * bazaga yoziladi va (autentifikatsiya qilingan /api so'rovlar uchun) audit
+   * jurnaliga yozuv qo'shiladi — javob mijozga jo'natilishidan OLDIN.
+   *
+   * Muhim: Vercel javob jo'natilgach funksiya jarayonini darhol to'xtatib
+   * qo'yishi mumkin, shuning uchun "javobdan keyin fon vazifasi" ishonchli
+   * emas — saqlash tugamaguncha javob jo'natilmaydi. Bitta joyda turgani
+   * uchun hech bir route buni chaqirishni unutib qo'ymaydi.
    */
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === "GET" || req.method === "HEAD") return next();
 
-    res.on("finish", () => {
-      if (res.statusCode >= 400) return;
-      try {
-        persist();
-      } catch (error) {
-        // Saqlash uzilsa ham so'rov allaqachon bajarilgan — faqat jurnalga yozamiz.
-        console.error("Bazaga saqlashda xatolik:", error);
+    const originalEnd = res.end.bind(res);
+    let finalizing = false;
+
+    (res as unknown as { end: (...args: unknown[]) => Response }).end = (
+      ...args: unknown[]
+    ) => {
+      if (finalizing || res.statusCode >= 400) {
+        return (originalEnd as (...a: unknown[]) => Response)(...args);
       }
-    });
+      finalizing = true;
+
+      const shouldAudit =
+        req.path.startsWith("/api") &&
+        !req.path.startsWith("/api/audit") &&
+        !!req.currentUser;
+
+      Promise.resolve()
+        .then(() => persist())
+        .then(() => {
+          if (!shouldAudit) return;
+          // `/api/customers/123?x=1` → `/customers/123` (prefiks va query'siz).
+          const apiPath = req.originalUrl.replace(/^\/api/, "").split("?")[0];
+          return recordAudit({
+            user: req.currentUser!,
+            action: auditActionFor(req.method),
+            entity: auditEntityFor(apiPath),
+            entityId: extractIdFromPath(apiPath),
+            summary: auditSummary(req.method, apiPath),
+            ip: clientIp(req),
+          });
+        })
+        .catch((error) => {
+          console.error("Bazaga saqlashda xatolik:", error);
+        })
+        .finally(() => {
+          (originalEnd as (...a: unknown[]) => Response)(...args);
+        });
+
+      return res;
+    };
 
     next();
   });
@@ -412,37 +467,9 @@ export function createServer() {
    */
   app.use("/api", requireAuth);
 
-  /**
-   * Audit-log middleware (TZ 14-bo'lim).
-   * `requireAuth` dan keyin turadi — foydalanuvchi ma'lum. Har bir muvaffaqiyatli
-   * o'zgartiruvchi so'rov (POST/PUT/PATCH/DELETE) kim/qachon/IP bilan yoziladi.
-   * Yo'l va metoddan avtomatik inson o'qiy oladigan tavsif quriladi.
-   */
-  app.use("/api", (req: Request, res: Response, next: NextFunction) => {
-    if (["GET", "HEAD"].includes(req.method)) return next();
-    // Audit sahifasining o'zini o'qish yoki login/logout bu yerda emas.
-    if (req.path.startsWith("/audit")) return next();
-
-    const ip = clientIp(req);
-    res.on("finish", () => {
-      if (res.statusCode >= 400 || !req.currentUser) return;
-      try {
-        // `/api/customers/123?x=1` → `/customers/123` (prefiks va query'siz).
-        const apiPath = req.originalUrl.replace(/^\/api/, "").split("?")[0];
-        recordAudit({
-          user: req.currentUser,
-          action: auditActionFor(req.method),
-          entity: auditEntityFor(apiPath),
-          entityId: extractIdFromPath(apiPath),
-          summary: auditSummary(req.method, apiPath),
-          ip,
-        });
-      } catch (error) {
-        console.error("Audit yozishda xatolik:", error);
-      }
-    });
-    next();
-  });
+  // Audit-log yozuvi (TZ 14-bo'lim) yuqoridagi umumiy "persist" middleware'ga
+  // birlashtirilgan — javob jo'natilishidan oldin, `req.currentUser` allaqachon
+  // ma'lum bo'lganda (bu middleware `requireAuth`dan keyin bajariladi).
 
   app.get("/api/auth/me", getCurrentUser);
 

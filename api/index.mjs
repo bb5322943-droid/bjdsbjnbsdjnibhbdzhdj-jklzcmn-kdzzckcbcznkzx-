@@ -13,6 +13,7 @@ import { z } from "zod";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { DatabaseSync } from "node:sqlite";
+import { Pool, types } from "pg";
 //#region server/lib/logger.ts
 var logDir = resolve(process.cwd(), "logs");
 mkdirSync(logDir, { recursive: true });
@@ -140,7 +141,7 @@ var handleDemo = (req, res) => {
 * SQLite orqali doimiy saqlash qatlami.
 * Production uchun PostgreSQL tavsiya etiladi (db-postgres.ts).
 */
-var USE_POSTGRES = !!process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgresql://");
+var USE_POSTGRES = !!process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith("postgresql://") || process.env.DATABASE_URL.startsWith("postgres://"));
 if (USE_POSTGRES) logger.info("Using PostgreSQL database");
 else logger.info("Using SQLite database");
 var IS_VERCEL = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
@@ -169,7 +170,7 @@ function db() {
 		database = new DatabaseSync(DB_PATH);
 		database.exec("PRAGMA journal_mode = WAL");
 		database.exec("PRAGMA foreign_keys = ON");
-		createSchema(database);
+		createSchema$1(database);
 		logger.info(`✅ SQLite database ishga tushdi: ${DB_PATH}`);
 		logger.info(`📊 Database location: ${IS_VERCEL ? "/tmp (Vercel)" : "local data/"}`);
 	} catch (error) {
@@ -343,6 +344,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_refunds_number ON refunds(refundNumber);
 CREATE INDEX IF NOT EXISTS idx_refunds_original_sale ON refunds(originalSaleId);
 CREATE INDEX IF NOT EXISTS idx_refunds_date ON refunds(refundDate);
 
+-- Supplier returns module tables
+CREATE TABLE IF NOT EXISTS supplier_returns (
+  id TEXT PRIMARY KEY, returnNumber TEXT NOT NULL, supplierId TEXT NOT NULL,
+  supplierName TEXT NOT NULL, productId TEXT NOT NULL, productName TEXT NOT NULL,
+  quantity INTEGER NOT NULL, reason TEXT NOT NULL, reasonText TEXT,
+  amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  returnDate TEXT NOT NULL, purchaseNumber TEXT, createdAt TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_returns_number ON supplier_returns(returnNumber);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_supplier ON supplier_returns(supplierId);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_product ON supplier_returns(productId);
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_date ON supplier_returns(returnDate);
+
 -- Posts module tables
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL,
@@ -392,7 +406,7 @@ var MIGRATIONS = [
 		definition: "TEXT"
 	}))
 ];
-function createSchema(instance) {
+function createSchema$1(instance) {
 	instance.exec(SCHEMA);
 	for (const { table, column, definition } of MIGRATIONS) {
 		if (instance.prepare(`PRAGMA table_info(${table})`).all().some((info) => info.name === column)) continue;
@@ -661,6 +675,22 @@ var BASE_TABLES = {
 		"refundDate",
 		"paymentMethod",
 		"status"
+	],
+	supplier_returns: [
+		"id",
+		"returnNumber",
+		"supplierId",
+		"supplierName",
+		"productId",
+		"productName",
+		"quantity",
+		"reason",
+		"reasonText",
+		"amount",
+		"status",
+		"returnDate",
+		"purchaseNumber",
+		"createdAt"
 	]
 };
 /** Soft-delete qo'llab-quvvatlaydigan jadvallar — ularga `deletedAt` ustuni qo'shiladi. */
@@ -688,7 +718,7 @@ var SOFT_DELETE_TABLES = new Set([
 */
 var TABLES = Object.fromEntries(Object.entries(BASE_TABLES).map(([table, columns]) => [table, SOFT_DELETE_TABLES.has(table) ? [...columns, "deletedAt"] : columns]));
 /** JSON sifatida saqlanadigan ustunlar — o'qishda qayta parse qilinadi. */
-var JSON_COLUMNS = new Set(["items"]);
+var JSON_COLUMNS$1 = new Set(["items"]);
 /**
 * SQLite faqat null/number/bigint/string/Uint8Array qabul qiladi.
 * Obyekt va massivlar JSON'ga, `undefined` esa null'ga aylantiriladi.
@@ -704,7 +734,7 @@ function toSqlValue(value) {
 function readTable(table) {
 	return db().prepare(`SELECT * FROM ${table}`).all().map((row) => {
 		const result = { ...row };
-		for (const column of JSON_COLUMNS) if (typeof result[column] === "string") try {
+		for (const column of JSON_COLUMNS$1) if (typeof result[column] === "string") try {
 			result[column] = JSON.parse(result[column]);
 		} catch {
 			result[column] = [];
@@ -737,6 +767,397 @@ function writeTable(table, rows) {
 /** Bazada umuman yozuv bor-yo'qligini tekshiradi — birinchi ishga tushirishni aniqlash uchun. */
 function isEmpty() {
 	return db().prepare("SELECT COUNT(*) AS count FROM employees").get().count === 0;
+}
+//#endregion
+//#region server/data/db-postgres.ts
+/**
+* PostgreSQL adapter — Vercel serverless muhitida ma'lumotlar barqaror
+* saqlanishi uchun. SQLite (`db.ts`) bilan bir xil jadval/ustun tuzilishi va
+* o'qish/yozish interfeysi, lekin ma'lumotlar barcha funksiya instance'lari
+* orasida umumiy — chunki `/tmp` har bir konteynerga xos va ular orasida
+* almashinmaydi (aynan shu sabab mahsulot qoldig'i kabi qiymatlar Vercel'da
+* tasodifiy noto'g'ri ko'rinardi).
+*/
+types.setTypeParser(20, (value) => parseInt(value, 10));
+types.setTypeParser(1700, (value) => parseFloat(value));
+var pool = null;
+function initPostgres() {
+	if (pool) return;
+	const connectionString = process.env.DATABASE_URL;
+	if (!connectionString) throw new Error("DATABASE_URL environment variable not set");
+	pool = new Pool({
+		connectionString,
+		max: 20,
+		idleTimeoutMillis: 3e4,
+		connectionTimeoutMillis: 1e4
+	});
+	pool.on("error", (err) => {
+		logger.error("PostgreSQL pool error:", err);
+	});
+	logger.info("PostgreSQL connection pool initialized");
+}
+async function getClient() {
+	if (!pool) initPostgres();
+	return pool.connect();
+}
+async function query(text, params) {
+	const client = await getClient();
+	try {
+		return await client.query(text, params);
+	} finally {
+		client.release();
+	}
+}
+/**
+* Jadval ta'riflari — `db.ts`dagi SQLite sxemasi bilan bir xil, Postgres
+* sintaksisida. Sana maydonlari ataylab TEXT (ISO satr), DATE/TIMESTAMP emas —
+* butun ilova (frontend va backend) ularni satr sifatida ishlatadi; agar
+* native sana turi ishlatilsa, `pg` ularni avtomatik JS Date obyektiga
+* aylantirib qo'yadi va bu butun ilovadagi sana bilan ishlashni buzadi.
+* Pul/miqdor maydonlari uchun DOUBLE PRECISION — NUMERIC emas, chunki `pg`
+* NUMERIC'ni string qilib qaytaradi (yuqoridagi type parser buni qoplasa ham,
+* DOUBLE PRECISION JS number'ning o'ziga ekvivalent, qo'shimcha o'girishsiz).
+*/
+var POSTGRES_SCHEMA = `
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, category TEXT NOT NULL,
+  account TEXT NOT NULL, date TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, type TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+
+CREATE TABLE IF NOT EXISTS employees (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, position TEXT NOT NULL,
+  department TEXT NOT NULL, status TEXT NOT NULL, salary DOUBLE PRECISION NOT NULL,
+  "hireDate" TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_email ON employees(email);
+
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, location TEXT NOT NULL,
+  quantity INTEGER NOT NULL, "minQuantity" INTEGER NOT NULL, price DOUBLE PRECISION NOT NULL,
+  category TEXT NOT NULL, supplier TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
+  "contactPerson" TEXT NOT NULL, phone TEXT NOT NULL, email TEXT NOT NULL,
+  region TEXT NOT NULL, address TEXT NOT NULL, status TEXT NOT NULL,
+  "createdDate" TEXT NOT NULL, note TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS suppliers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, "contactPerson" TEXT NOT NULL,
+  phone TEXT NOT NULL, email TEXT NOT NULL, category TEXT NOT NULL,
+  address TEXT NOT NULL, status TEXT NOT NULL, rating INTEGER NOT NULL,
+  "createdDate" TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS branches (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
+  region TEXT NOT NULL, address TEXT NOT NULL, phone TEXT NOT NULL,
+  manager TEXT NOT NULL, status TEXT NOT NULL, "createdDate" TEXT NOT NULL,
+  note TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY, "orderNumber" TEXT NOT NULL, "customerId" TEXT NOT NULL,
+  "customerName" TEXT NOT NULL, items JSONB NOT NULL, total DOUBLE PRECISION NOT NULL,
+  status TEXT NOT NULL, "paymentStatus" TEXT NOT NULL, "orderDate" TEXT NOT NULL,
+  "deliveryDate" TEXT NOT NULL, "assignedTo" TEXT NOT NULL, note TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders("customerId");
+
+CREATE TABLE IF NOT EXISTS purchases (
+  id TEXT PRIMARY KEY, "purchaseNumber" TEXT NOT NULL, "supplierId" TEXT NOT NULL,
+  "supplierName" TEXT NOT NULL, items JSONB NOT NULL, total DOUBLE PRECISION NOT NULL,
+  status TEXT NOT NULL, "paymentStatus" TEXT NOT NULL, "orderDate" TEXT NOT NULL,
+  "expectedDate" TEXT NOT NULL, "createdBy" TEXT NOT NULL, note TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id TEXT PRIMARY KEY, "invoiceNumber" TEXT NOT NULL, "orderId" TEXT,
+  "orderNumber" TEXT NOT NULL, "customerId" TEXT NOT NULL, "customerName" TEXT NOT NULL,
+  amount DOUBLE PRECISION NOT NULL, "paidAmount" DOUBLE PRECISION NOT NULL, status TEXT NOT NULL,
+  "issueDate" TEXT NOT NULL, "dueDate" TEXT NOT NULL, note TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS attendance (
+  id TEXT PRIMARY KEY, "employeeId" TEXT NOT NULL, "employeeName" TEXT NOT NULL,
+  department TEXT NOT NULL, date TEXT NOT NULL, status TEXT NOT NULL,
+  "checkIn" TEXT NOT NULL, "checkOut" TEXT NOT NULL, hours DOUBLE PRECISION NOT NULL, note TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+
+CREATE TABLE IF NOT EXISTS leave_requests (
+  id TEXT PRIMARY KEY, "employeeId" TEXT NOT NULL, "employeeName" TEXT NOT NULL,
+  type TEXT NOT NULL, "startDate" TEXT NOT NULL, "endDate" TEXT NOT NULL,
+  days INTEGER NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL,
+  "requestedDate" TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, login TEXT NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL,
+  status TEXT NOT NULL, "lastLogin" TEXT NOT NULL, "employeeId" TEXT,
+  "createdDate" TEXT NOT NULL, "passwordHash" TEXT NOT NULL DEFAULT '',
+  "deletedAt" TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login ON users(login);
+
+CREATE TABLE IF NOT EXISTS movements (
+  id TEXT PRIMARY KEY, "productId" TEXT NOT NULL, "productName" TEXT NOT NULL,
+  type TEXT NOT NULL, quantity INTEGER NOT NULL, "balanceAfter" INTEGER NOT NULL,
+  reason TEXT NOT NULL, reference TEXT NOT NULL, date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS deals (
+  id TEXT PRIMARY KEY, "clientName" TEXT NOT NULL, status TEXT NOT NULL,
+  value DOUBLE PRECISION NOT NULL, description TEXT NOT NULL, "createdDate" TEXT NOT NULL,
+  "expectedCloseDate" TEXT NOT NULL, "assignedTo" TEXT NOT NULL,
+  "deletedAt" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "expiresAt" BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions("userId");
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "userName" TEXT NOT NULL,
+  "userRole" TEXT NOT NULL, action TEXT NOT NULL, entity TEXT NOT NULL,
+  "entityId" TEXT NOT NULL, summary TEXT NOT NULL, "ipAddress" TEXT NOT NULL,
+  timestamp TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
+
+CREATE TABLE IF NOT EXISTS payrolls (
+  id TEXT PRIMARY KEY, "employeeId" TEXT NOT NULL, "employeeName" TEXT NOT NULL,
+  department TEXT NOT NULL, period TEXT NOT NULL, "baseSalary" DOUBLE PRECISION NOT NULL,
+  "workingDays" INTEGER NOT NULL, "presentDays" INTEGER NOT NULL,
+  "absenceDeduction" DOUBLE PRECISION NOT NULL, bonus DOUBLE PRECISION NOT NULL, penalty DOUBLE PRECISION NOT NULL,
+  tax DOUBLE PRECISION NOT NULL, "netSalary" DOUBLE PRECISION NOT NULL, status TEXT NOT NULL,
+  "createdDate" TEXT NOT NULL, note TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS activities (
+  id TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "userInitials" TEXT NOT NULL,
+  "userBgClass" TEXT NOT NULL, action TEXT NOT NULL, details TEXT NOT NULL,
+  timestamp TEXT NOT NULL, icon TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS debt_payments (
+  id TEXT PRIMARY KEY, "orderId" TEXT NOT NULL, "orderNumber" TEXT NOT NULL,
+  "customerId" TEXT NOT NULL, "customerName" TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL,
+  "paymentDate" TEXT NOT NULL, "paymentMethod" TEXT NOT NULL, note TEXT NOT NULL,
+  "createdBy" TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_debt_payments_customer ON debt_payments("customerId");
+CREATE INDEX IF NOT EXISTS idx_debt_payments_order ON debt_payments("orderId");
+CREATE INDEX IF NOT EXISTS idx_debt_payments_date ON debt_payments("paymentDate");
+
+CREATE TABLE IF NOT EXISTS sales (
+  id TEXT PRIMARY KEY, "saleNumber" TEXT NOT NULL, "customerId" TEXT,
+  "customerName" TEXT, "customerPhone" TEXT, items JSONB NOT NULL,
+  subtotal DOUBLE PRECISION NOT NULL, discount DOUBLE PRECISION NOT NULL DEFAULT 0, tax DOUBLE PRECISION NOT NULL DEFAULT 0,
+  total DOUBLE PRECISION NOT NULL, "paymentMethod" TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'completed',
+  "sellerId" TEXT NOT NULL, "sellerName" TEXT NOT NULL, "branchId" TEXT NOT NULL,
+  "branchName" TEXT NOT NULL, "saleDate" TEXT NOT NULL, note TEXT DEFAULT '',
+  "receiptPrinted" INTEGER NOT NULL DEFAULT 0,
+  "deletedAt" TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_number ON sales("saleNumber");
+CREATE INDEX IF NOT EXISTS idx_sales_date ON sales("saleDate");
+CREATE INDEX IF NOT EXISTS idx_sales_seller ON sales("sellerId");
+CREATE INDEX IF NOT EXISTS idx_sales_branch ON sales("branchId");
+
+CREATE TABLE IF NOT EXISTS refunds (
+  id TEXT PRIMARY KEY, "refundNumber" TEXT NOT NULL, "originalSaleId" TEXT NOT NULL,
+  "originalSaleNumber" TEXT NOT NULL, items JSONB NOT NULL, "refundAmount" DOUBLE PRECISION NOT NULL,
+  "refundReason" TEXT NOT NULL, "processedById" TEXT NOT NULL, "processedByName" TEXT NOT NULL,
+  "refundDate" TEXT NOT NULL, "paymentMethod" TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'completed',
+  "deletedAt" TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_refunds_number ON refunds("refundNumber");
+CREATE INDEX IF NOT EXISTS idx_refunds_original_sale ON refunds("originalSaleId");
+CREATE INDEX IF NOT EXISTS idx_refunds_date ON refunds("refundDate");
+
+CREATE TABLE IF NOT EXISTS supplier_returns (
+  id TEXT PRIMARY KEY, "returnNumber" TEXT NOT NULL, "supplierId" TEXT NOT NULL,
+  "supplierName" TEXT NOT NULL, "productId" TEXT NOT NULL, "productName" TEXT NOT NULL,
+  quantity INTEGER NOT NULL, reason TEXT NOT NULL, "reasonText" TEXT,
+  amount DOUBLE PRECISION NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  "returnDate" TEXT NOT NULL, "purchaseNumber" TEXT, "createdAt" TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_returns_number ON supplier_returns("returnNumber");
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_supplier ON supplier_returns("supplierId");
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_product ON supplier_returns("productId");
+CREATE INDEX IF NOT EXISTS idx_supplier_returns_date ON supplier_returns("returnDate");
+
+CREATE TABLE IF NOT EXISTS posts (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL,
+  excerpt TEXT, "imageUrl" TEXT, "authorId" TEXT NOT NULL, "authorName" TEXT NOT NULL,
+  category TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft',
+  tags TEXT, "viewCount" INTEGER NOT NULL DEFAULT 0, "likesCount" INTEGER NOT NULL DEFAULT 0,
+  "createdDate" TEXT NOT NULL, "updatedDate" TEXT NOT NULL, "publishedDate" TEXT,
+  "deletedAt" TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_posts_author ON posts("authorId");
+CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);
+CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts("createdDate");
+CREATE INDEX IF NOT EXISTS idx_posts_published ON posts("publishedDate");
+`;
+async function createSchema() {
+	await query(POSTGRES_SCHEMA);
+	logger.info("PostgreSQL schema created/verified");
+}
+var schemaReady = null;
+/** Sxema jarayon davomida faqat bir marta yaratiladi/tekshiriladi. */
+function ensureSchema() {
+	if (!schemaReady) schemaReady = createSchema().catch((error) => {
+		schemaReady = null;
+		throw error;
+	});
+	return schemaReady;
+}
+var JSON_COLUMNS = new Set(["items"]);
+function toPgValue(column, value) {
+	if (value === void 0 || value === null) return null;
+	if (JSON_COLUMNS.has(column) && typeof value === "object") return JSON.stringify(value);
+	if (typeof value === "boolean") return value ? 1 : 0;
+	return value;
+}
+/** Bazada umuman yozuv bor-yo'qligini tekshiradi — birinchi ishga tushirishni aniqlash uchun. */
+async function pgIsEmpty() {
+	await ensureSchema();
+	const result = await query("SELECT COUNT(*) AS count FROM employees");
+	return Number(result.rows[0].count) === 0;
+}
+/** Jadvaldagi barcha qatorlarni o'qiydi. */
+async function pgReadTable(table) {
+	await ensureSchema();
+	return (await query(`SELECT * FROM ${table}`)).rows;
+}
+/**
+* Jadvalni berilgan qatorlar bilan to'liq almashtiradi (bitta tranzaksiyada) —
+* `db.ts`dagi SQLite `writeTable` bilan bir xil xatti-harakat.
+*/
+async function pgWriteTable(table, rows) {
+	await ensureSchema();
+	const columns = TABLES[table];
+	const quotedColumns = columns.map((c) => `"${c}"`).join(", ");
+	const client = await getClient();
+	try {
+		await client.query("BEGIN");
+		await client.query(`DELETE FROM ${table}`);
+		for (const row of rows) {
+			const record = row;
+			const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
+			const values = columns.map((c) => toPgValue(c, record[c]));
+			await client.query(`INSERT INTO ${table} (${quotedColumns}) VALUES (${placeholders})`, values);
+		}
+		await client.query("COMMIT");
+	} catch (error) {
+		await client.query("ROLLBACK");
+		throw error;
+	} finally {
+		client.release();
+	}
+}
+async function pgDeleteSessionByToken(token) {
+	await ensureSchema();
+	await query(`DELETE FROM sessions WHERE token = $1`, [token]);
+}
+async function pgDeleteSessionsByUser(userId) {
+	await ensureSchema();
+	await query(`DELETE FROM sessions WHERE "userId" = $1`, [userId]);
+}
+async function pgDeleteExpiredSessions() {
+	await ensureSchema();
+	await query(`DELETE FROM sessions WHERE "expiresAt" < $1`, [Date.now()]);
+}
+/** Audit jurnali — `lib/audit.ts` va `routes/audit.ts` orqali chaqiriladi. */
+async function pgInsertAuditLog(log) {
+	await ensureSchema();
+	await query(`INSERT INTO audit_logs (id, "userId", "userName", "userRole", action, entity, "entityId", summary, "ipAddress", timestamp)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [
+		log.id,
+		log.userId,
+		log.userName,
+		log.userRole,
+		log.action,
+		log.entity,
+		log.entityId,
+		log.summary,
+		log.ipAddress,
+		log.timestamp
+	]);
+}
+async function pgQueryAuditLogs(where, requestedPage, limit) {
+	await ensureSchema();
+	const clauses = [];
+	const params = [];
+	let i = 1;
+	if (where.action) {
+		clauses.push(`action = $${i++}`);
+		params.push(where.action);
+	}
+	if (where.userId) {
+		clauses.push(`"userId" = $${i++}`);
+		params.push(where.userId);
+	}
+	if (where.from) {
+		clauses.push(`timestamp >= $${i++}`);
+		params.push(where.from);
+	}
+	if (where.to) {
+		clauses.push(`timestamp <= $${i++}`);
+		params.push(where.to);
+	}
+	if (where.search) {
+		const like = `%${where.search.toLowerCase()}%`;
+		clauses.push(`(LOWER("userName") LIKE $${i} OR LOWER(summary) LIKE $${i + 1} OR LOWER(entity) LIKE $${i + 2})`);
+		params.push(like, like, like);
+		i += 3;
+	}
+	const whereSql = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+	const totalResult = await query(`SELECT COUNT(*) AS n FROM audit_logs ${whereSql}`, params);
+	const total = Number(totalResult.rows[0].n);
+	const pages = Math.max(1, Math.ceil(total / limit));
+	const page = Math.min(requestedPage, pages);
+	const offset = (page - 1) * limit;
+	return {
+		rows: (await query(`SELECT * FROM audit_logs ${whereSql} ORDER BY timestamp DESC LIMIT $${i} OFFSET $${i + 1}`, [
+			...params,
+			limit,
+			offset
+		])).rows,
+		total,
+		page,
+		pages
+	};
+}
+async function pgAuditStats() {
+	await ensureSchema();
+	const count = async (sql, params = []) => Number((await query(sql, params)).rows[0].n);
+	const todayStart = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+	return {
+		total: await count("SELECT COUNT(*) AS n FROM audit_logs"),
+		today: await count("SELECT COUNT(*) AS n FROM audit_logs WHERE timestamp >= $1", [todayStart]),
+		creates: await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'create'"),
+		updates: await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'update'"),
+		deletes: await count("SELECT COUNT(*) AS n FROM audit_logs WHERE action = 'delete'")
+	};
 }
 //#endregion
 //#region server/lib/auth.ts
@@ -787,16 +1208,19 @@ function verifyAccessToken(token) {
 		return null;
 	}
 }
-function destroySession(token) {
-	db().prepare("DELETE FROM sessions WHERE token = ?").run(token);
+async function destroySession(token) {
+	if (USE_POSTGRES) await pgDeleteSessionByToken(token);
+	else db().prepare("DELETE FROM sessions WHERE token = ?").run(token);
 }
 /** Foydalanuvchining barcha sessiyalarini bekor qiladi (o'chirilganda/bloklanganda). */
-function destroyUserSessions(userId) {
-	db().prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
+async function destroyUserSessions(userId) {
+	if (USE_POSTGRES) await pgDeleteSessionsByUser(userId);
+	else db().prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
 }
 /** Muddati o'tgan sessiyalarni tozalaydi — server ishga tushganda chaqiriladi. */
-function purgeExpiredSessions() {
-	db().prepare("DELETE FROM sessions WHERE expiresAt < ?").run(Date.now());
+async function purgeExpiredSessions() {
+	if (USE_POSTGRES) await pgDeleteExpiredSessions();
+	else db().prepare("DELETE FROM sessions WHERE expiresAt < ?").run(Date.now());
 }
 /** So'rov sarlavhasidan Bearer tokenni ajratadi. */
 function extractToken(header) {
@@ -2009,13 +2433,13 @@ function buildLeaveRequests(employees) {
 * Bu parol production'da ham ishlaydi (environment variable bo'lmasa)
 */
 var DEMO_PASSWORD = "123456";
-var PRODUCTION_ADMIN_EMAIL$1 = "admin@orbiserp.uz";
-var PRODUCTION_ADMIN_PASSWORD$1 = "OrbisAdmin2024!";
+var PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
+var PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
 function buildUsers(employees) {
 	const now = /* @__PURE__ */ new Date();
 	const createdDate = isoDate(now.getFullYear(), now.getMonth(), now.getDate());
-	const adminEmail = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL$1;
-	const adminPassword = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD$1;
+	const adminEmail = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
+	const adminPassword = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
 	const adminPasswordHash = hashPassword(adminPassword);
 	const demoPasswordHash = hashPassword("123456");
 	const users = [
@@ -2229,181 +2653,256 @@ function buildSeedData() {
 * Yagona ma'lumotlar ombori. Barcha route'lar shu yerdan o'qiydi, shuning uchun
 * bir bo'limdagi o'zgarish boshqa bo'lim statistikasida ham darhol aks etadi.
 *
-* Massivlar — ish jarayonidagi nusxa (tez filtrlash uchun), SQLite esa doimiy manba:
-* server ishga tushganda bazadan yuklanadi, o'zgarishdan keyin `persist()` bilan
-* qayta yoziladi. Shu sababli kiritilgan yozuvlar qayta ishga tushirilgandan keyin
-* ham saqlanib qoladi.
+* Massivlar — ish jarayonidagi nusxa (tez filtrlash uchun), doimiy manba esa
+* SQLite (mahalliy) yoki PostgreSQL (Vercel/production, `DATABASE_URL` orqali).
+*
+* MUHIM: Vercel serverless funksiyalari bir nechta mustaqil konteynerda
+* ishlashi mumkin, har birining o'z vaqtinchalik `/tmp` fayl tizimi bor va
+* ular bir-birining yozganini ko'rmaydi. Shu sabab SQLite `/tmp`da ishlatilsa,
+* masalan mahsulot qoldig'i turli so'rovlarda turlicha (tasodifiy) ko'rinishi
+* mumkin edi. PostgreSQL barcha instance'lar uchun umumiy va doimiy bo'lgani
+* uchun bu muammoni hal qiladi — shuning uchun har bir so'rov boshida qayta
+* yuklanadi (`reloadStore`) va har bir yozuvdan keyin darhol saqlanadi
+* (`persist`), javob jo'natilishidan OLDIN (server/index.ts).
 */
-console.log("🔍 Checking database state...");
-var dbEmpty = isEmpty();
-console.log(`📊 Database empty: ${dbEmpty}`);
-if (dbEmpty) {
-	console.log("🌱 Seeding database with demo data...");
-	try {
-		const seed = buildSeedData();
-		console.log("📝 Writing tables...");
-		writeTable("employees", seed.employees);
-		writeTable("products", seed.products);
-		writeTable("customers", seed.customers);
-		writeTable("suppliers", seed.suppliers);
-		writeTable("branches", seed.branches);
-		writeTable("orders", seed.orders);
-		writeTable("purchases", seed.purchases);
-		writeTable("invoices", seed.invoices);
-		writeTable("attendance", seed.attendance);
-		writeTable("leave_requests", seed.leaveRequests);
-		writeTable("users", seed.users);
-		writeTable("movements", seed.movements);
-		writeTable("deals", seed.deals);
-		writeTable("payrolls", seed.payrolls);
-		writeTable("transactions", seed.transactions);
-		writeTable("activities", seed.activities);
-		console.log("✅ Database seeded successfully");
-	} catch (seedError) {
-		console.error("❌ Database seeding failed:", seedError);
-		throw seedError;
-	}
-} else console.log("✅ Database already contains data");
-console.log("📖 Reading tables from database...");
-var employees$1 = readTable("employees");
-var products$1 = readTable("products");
-var customers$1 = readTable("customers");
-var suppliers$1 = readTable("suppliers");
-var branches = readTable("branches");
-var orders$1 = readTable("orders");
-var purchases$1 = readTable("purchases");
-var invoices = readTable("invoices");
-var attendance = readTable("attendance");
-var leaveRequests = readTable("leave_requests");
-var users$1 = readTable("users");
-var movements = readTable("movements");
-var deals$1 = readTable("deals");
-var payrolls$1 = readTable("payrolls");
-var transactions$1 = readTable("transactions");
-var activities = readTable("activities");
-var debtPayments = readTable("debt_payments");
-var sales = readTable("sales");
-var refunds = readTable("refunds");
-console.log("✅ Tables loaded successfully");
-console.log(`📊 Data counts: users=${users$1?.length || 0}, employees=${employees$1?.length || 0}, products=${products$1?.length || 0}`);
+var employees$1 = [];
+var products$1 = [];
+var customers$1 = [];
+var suppliers$1 = [];
+var branches = [];
+var orders$1 = [];
+var purchases$1 = [];
+var invoices = [];
+var attendance = [];
+var leaveRequests = [];
+var users$1 = [];
+var movements = [];
+var deals$1 = [];
+var payrolls$1 = [];
+var transactions$1 = [];
+var activities = [];
+var debtPayments = [];
+var sales = [];
+var refunds = [];
+var supplierReturns = [];
+/** Massiv referensiyasini saqlab, ichidagi qatorlarni to'liq almashtiradi. */
+function replaceContents(target, fresh) {
+	target.length = 0;
+	target.push(...fresh);
+}
+async function loadTable(table) {
+	return USE_POSTGRES ? pgReadTable(table) : readTable(table);
+}
+async function saveTable(table, rows) {
+	if (USE_POSTGRES) await pgWriteTable(table, rows);
+	else writeTable(table, rows);
+}
+async function loadAllTables() {
+	replaceContents(employees$1, await loadTable("employees"));
+	replaceContents(products$1, await loadTable("products"));
+	replaceContents(customers$1, await loadTable("customers"));
+	replaceContents(suppliers$1, await loadTable("suppliers"));
+	replaceContents(branches, await loadTable("branches"));
+	replaceContents(orders$1, await loadTable("orders"));
+	replaceContents(purchases$1, await loadTable("purchases"));
+	replaceContents(invoices, await loadTable("invoices"));
+	replaceContents(attendance, await loadTable("attendance"));
+	replaceContents(leaveRequests, await loadTable("leave_requests"));
+	replaceContents(users$1, await loadTable("users"));
+	replaceContents(movements, await loadTable("movements"));
+	replaceContents(deals$1, await loadTable("deals"));
+	replaceContents(payrolls$1, await loadTable("payrolls"));
+	replaceContents(transactions$1, await loadTable("transactions"));
+	replaceContents(activities, await loadTable("activities"));
+	replaceContents(debtPayments, await loadTable("debt_payments"));
+	replaceContents(sales, await loadTable("sales"));
+	replaceContents(refunds, await loadTable("refunds"));
+	replaceContents(supplierReturns, await loadTable("supplier_returns"));
+}
 /**
-* Auth qo'shilishidan oldin yaratilgan bazada parol hash'i bo'sh bo'ladi.
-* Bunday hisoblarga standart parol beriladi, aks holda hech kim kira olmaydi.
+* Xotiradagi holatni bazaga yozadi.
+* Har bir o'zgartiruvchi so'rov javobi jo'natilishidan OLDIN chaqiriladi
+* (`server/index.ts`) — Vercel javob jo'natilgach funksiyani darhol
+* to'xtatib qo'yishi mumkin, shu sabab yozish "fire-and-forget" emas.
 */
-var usersMissingPassword = users$1.filter((user) => !user.passwordHash);
-if (usersMissingPassword.length > 0) {
-	for (const user of usersMissingPassword) user.passwordHash = hashPassword(DEFAULT_PASSWORD);
-	writeTable("users", users$1);
-	console.info(`${usersMissingPassword.length} ta hisobga standart parol o'rnatildi: ${DEFAULT_PASSWORD}`);
+async function persist() {
+	await saveTable("employees", employees$1);
+	await saveTable("products", products$1);
+	await saveTable("customers", customers$1);
+	await saveTable("suppliers", suppliers$1);
+	await saveTable("branches", branches);
+	await saveTable("orders", orders$1);
+	await saveTable("purchases", purchases$1);
+	await saveTable("invoices", invoices);
+	await saveTable("attendance", attendance);
+	await saveTable("leave_requests", leaveRequests);
+	await saveTable("users", users$1);
+	await saveTable("movements", movements);
+	await saveTable("deals", deals$1);
+	await saveTable("payrolls", payrolls$1);
+	await saveTable("transactions", transactions$1);
+	await saveTable("activities", activities);
+	await saveTable("debt_payments", debtPayments);
+	await saveTable("sales", sales);
+	await saveTable("refunds", refunds);
+	await saveTable("supplier_returns", supplierReturns);
+}
+/**
+* Boshqa instance'lar yozgan eng so'nggi holatni qayta yuklaydi.
+* PostgreSQL'da har bir so'rov boshida chaqiriladi (server/index.ts) — shu
+* orqali barcha serverless instance'lar bir xil ma'lumotni ko'radi. Mahalliy
+* SQLite rejimida bitta jarayon ichida massivlar allaqachon dolzarb bo'lgani
+* uchun keraksiz ish qilmaslik uchun hech narsa bajarmaydi.
+*/
+async function reloadStore() {
+	if (!USE_POSTGRES) return;
+	await loadAllTables();
+}
+var readyPromise = null;
+/**
+* Ombor birinchi marta ishlatilishidan oldin (server ishga tushganda yoki
+* Vercel funksiyasi "sovuq" boshlanganda) bir marta chaqiriladi. Keyingi
+* chaqiruvlar xotiradagi (allaqachon bajarilgan) promise'ni qaytaradi.
+*/
+function ensureStoreReady() {
+	if (!readyPromise) readyPromise = initStore().catch((error) => {
+		readyPromise = null;
+		throw error;
+	});
+	return readyPromise;
+}
+async function initStore() {
+	console.log("🔍 Checking database state...");
+	const dbEmpty = USE_POSTGRES ? await pgIsEmpty() : isEmpty();
+	console.log(`📊 Database empty: ${dbEmpty}`);
+	if (dbEmpty) {
+		console.log("🌱 Seeding database with demo data...");
+		try {
+			const seed = buildSeedData();
+			console.log("📝 Writing tables...");
+			await saveTable("employees", seed.employees);
+			await saveTable("products", seed.products);
+			await saveTable("customers", seed.customers);
+			await saveTable("suppliers", seed.suppliers);
+			await saveTable("branches", seed.branches);
+			await saveTable("orders", seed.orders);
+			await saveTable("purchases", seed.purchases);
+			await saveTable("invoices", seed.invoices);
+			await saveTable("attendance", seed.attendance);
+			await saveTable("leave_requests", seed.leaveRequests);
+			await saveTable("users", seed.users);
+			await saveTable("movements", seed.movements);
+			await saveTable("deals", seed.deals);
+			await saveTable("payrolls", seed.payrolls);
+			await saveTable("transactions", seed.transactions);
+			await saveTable("activities", seed.activities);
+			console.log("✅ Database seeded successfully");
+		} catch (seedError) {
+			console.error("❌ Database seeding failed:", seedError);
+			throw seedError;
+		}
+	} else console.log("✅ Database already contains data");
+	console.log("📖 Reading tables from database...");
+	await loadAllTables();
+	console.log("✅ Tables loaded successfully");
+	console.log(`📊 Data counts: users=${users$1?.length || 0}, employees=${employees$1?.length || 0}, products=${products$1?.length || 0}`);
+	/**
+	* Auth qo'shilishidan oldin yaratilgan bazada parol hash'i bo'sh bo'ladi.
+	* Bunday hisoblarga standart parol beriladi, aks holda hech kim kira olmaydi.
+	*/
+	const usersMissingPassword = users$1.filter((user) => !user.passwordHash);
+	if (usersMissingPassword.length > 0) {
+		for (const user of usersMissingPassword) user.passwordHash = hashPassword(DEFAULT_PASSWORD);
+		await saveTable("users", users$1);
+		console.info(`${usersMissingPassword.length} ta hisobga standart parol o'rnatildi: ${DEFAULT_PASSWORD}`);
+	}
+	await ensureAdminUser();
 }
 /**
 * Production deploymentda admin foydalanuvchini yaratish yoki yangilash.
 * Environment variable'lardan yoki hardcoded qiymatlardan olinadi.
-* 
+*
 * DEPLOY UCHUN DEFAULT LOGIN (hardcoded - ishonchli):
 * Email: admin@orbiserp.uz
 * Parol: OrbisAdmin2024!
 */
-var PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
-var PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
-var ADMIN_EMAIL = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
-var ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
-console.log("🔐 Admin initialization:");
-console.log("   Email from env:", process.env.ADMIN_EMAIL || "not set");
-console.log("   Password from env:", process.env.ADMIN_PASSWORD ? "***" : "not set");
-console.log("   Using Email:", ADMIN_EMAIL);
-console.log("   Using Password:", ADMIN_PASSWORD_FROM_ENV ? "***" : "empty");
-console.log("   Users array length:", users$1?.length || 0);
-try {
-	if (!ADMIN_PASSWORD_FROM_ENV) {
-		console.error("❌ CRITICAL: Admin password not configured!");
-		throw new Error("Admin password is required");
+async function ensureAdminUser() {
+	const PRODUCTION_ADMIN_EMAIL = "admin@orbiserp.uz";
+	const PRODUCTION_ADMIN_PASSWORD = "OrbisAdmin2024!";
+	const ADMIN_EMAIL = process.env.ADMIN_EMAIL || PRODUCTION_ADMIN_EMAIL;
+	const ADMIN_PASSWORD_FROM_ENV = process.env.ADMIN_PASSWORD || PRODUCTION_ADMIN_PASSWORD;
+	console.log("🔐 Admin initialization:");
+	console.log("   Email from env:", process.env.ADMIN_EMAIL || "not set");
+	console.log("   Password from env:", process.env.ADMIN_PASSWORD ? "***" : "not set");
+	console.log("   Using Email:", ADMIN_EMAIL);
+	console.log("   Using Password:", ADMIN_PASSWORD_FROM_ENV ? "***" : "empty");
+	console.log("   Users array length:", users$1?.length || 0);
+	try {
+		if (!ADMIN_PASSWORD_FROM_ENV) {
+			console.error("❌ CRITICAL: Admin password not configured!");
+			throw new Error("Admin password is required");
+		}
+		let adminUser = users$1.find((u) => u.email === ADMIN_EMAIL || u.login === "admin" || u.role === "admin");
+		console.log("🔍 Admin user search result:", adminUser ? "found" : "not found");
+		if (!adminUser) {
+			console.log("📝 Creating new admin user...");
+			const now = /* @__PURE__ */ new Date();
+			const newAdminId = nextId();
+			adminUser = {
+				id: newAdminId,
+				name: "Administrator",
+				login: "admin",
+				email: ADMIN_EMAIL,
+				role: "admin",
+				status: "active",
+				lastLogin: now.toISOString(),
+				employeeId: null,
+				createdDate: now.toISOString().split("T")[0],
+				passwordHash: hashPassword(ADMIN_PASSWORD_FROM_ENV)
+			};
+			users$1.push(adminUser);
+			await saveTable("users", users$1);
+			console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
+			console.info("🔑 Admin login ma'lumotlari:");
+			console.info(`   ID: ${newAdminId}`);
+			console.info(`   Login: admin`);
+			console.info(`   Email: ${ADMIN_EMAIL}`);
+			console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+			console.info(`   Password hash length: ${adminUser.passwordHash?.length || 0}`);
+		} else {
+			console.log("♻️ Updating existing admin user...");
+			const oldHash = adminUser.passwordHash;
+			adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
+			adminUser.email = ADMIN_EMAIL;
+			adminUser.login = "admin";
+			adminUser.role = "admin";
+			adminUser.status = "active";
+			await saveTable("users", users$1);
+			console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
+			console.info("🔑 Admin login ma'lumotlari:");
+			console.info(`   ID: ${adminUser.id}`);
+			console.info(`   Login: ${adminUser.login}`);
+			console.info(`   Email: ${ADMIN_EMAIL}`);
+			console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
+			console.info(`   Old hash length: ${oldHash?.length || 0}`);
+			console.info(`   New hash length: ${adminUser.passwordHash?.length || 0}`);
+		}
+		const verifyAdmin = users$1.find((u) => u.login === "admin" || u.email === ADMIN_EMAIL);
+		if (!verifyAdmin) console.error("❌ CRITICAL: Admin user not found after creation!");
+		else console.log("✅ Admin user verification passed:", {
+			id: verifyAdmin.id,
+			login: verifyAdmin.login,
+			email: verifyAdmin.email,
+			hasPassword: !!verifyAdmin.passwordHash,
+			passwordHashLength: verifyAdmin.passwordHash?.length || 0,
+			status: verifyAdmin.status,
+			role: verifyAdmin.role
+		});
+	} catch (adminError) {
+		console.error("❌ CRITICAL: Admin initialization failed!");
+		console.error("Error:", adminError);
+		throw adminError;
 	}
-	let adminUser = users$1.find((u) => u.email === ADMIN_EMAIL || u.login === "admin" || u.role === "admin");
-	console.log("🔍 Admin user search result:", adminUser ? "found" : "not found");
-	if (!adminUser) {
-		console.log("📝 Creating new admin user...");
-		const now = /* @__PURE__ */ new Date();
-		const newAdminId = nextId();
-		adminUser = {
-			id: newAdminId,
-			name: "Administrator",
-			login: "admin",
-			email: ADMIN_EMAIL,
-			role: "admin",
-			status: "active",
-			lastLogin: now.toISOString(),
-			employeeId: null,
-			createdDate: now.toISOString().split("T")[0],
-			passwordHash: hashPassword(ADMIN_PASSWORD_FROM_ENV)
-		};
-		users$1.push(adminUser);
-		writeTable("users", users$1);
-		console.info("✅ Admin foydalanuvchi yaratildi:", ADMIN_EMAIL);
-		console.info("🔑 Admin login ma'lumotlari:");
-		console.info(`   ID: ${newAdminId}`);
-		console.info(`   Login: admin`);
-		console.info(`   Email: ${ADMIN_EMAIL}`);
-		console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
-		console.info(`   Password hash length: ${adminUser.passwordHash?.length || 0}`);
-	} else {
-		console.log("♻️ Updating existing admin user...");
-		const oldHash = adminUser.passwordHash;
-		adminUser.passwordHash = hashPassword(ADMIN_PASSWORD_FROM_ENV);
-		adminUser.email = ADMIN_EMAIL;
-		adminUser.login = "admin";
-		adminUser.role = "admin";
-		adminUser.status = "active";
-		writeTable("users", users$1);
-		console.info("✅ Admin foydalanuvchi paroli yangilandi:", ADMIN_EMAIL);
-		console.info("🔑 Admin login ma'lumotlari:");
-		console.info(`   ID: ${adminUser.id}`);
-		console.info(`   Login: ${adminUser.login}`);
-		console.info(`   Email: ${ADMIN_EMAIL}`);
-		console.info(`   Parol: ${ADMIN_PASSWORD_FROM_ENV}`);
-		console.info(`   Old hash length: ${oldHash?.length || 0}`);
-		console.info(`   New hash length: ${adminUser.passwordHash?.length || 0}`);
-	}
-	const verifyAdmin = users$1.find((u) => u.login === "admin" || u.email === ADMIN_EMAIL);
-	if (!verifyAdmin) console.error("❌ CRITICAL: Admin user not found after creation!");
-	else console.log("✅ Admin user verification passed:", {
-		id: verifyAdmin.id,
-		login: verifyAdmin.login,
-		email: verifyAdmin.email,
-		hasPassword: !!verifyAdmin.passwordHash,
-		passwordHashLength: verifyAdmin.passwordHash?.length || 0,
-		status: verifyAdmin.status,
-		role: verifyAdmin.role
-	});
-} catch (adminError) {
-	console.error("❌ CRITICAL: Admin initialization failed!");
-	console.error("Error:", adminError);
-	throw adminError;
-}
-/**
-* Xotiradagi holatni bazaga yozadi.
-* O'zgartiruvchi so'rovdan keyin chaqiriladi (`server/index.ts` dagi middleware).
-*/
-function persist() {
-	writeTable("employees", employees$1);
-	writeTable("products", products$1);
-	writeTable("customers", customers$1);
-	writeTable("suppliers", suppliers$1);
-	writeTable("branches", branches);
-	writeTable("orders", orders$1);
-	writeTable("purchases", purchases$1);
-	writeTable("invoices", invoices);
-	writeTable("attendance", attendance);
-	writeTable("leave_requests", leaveRequests);
-	writeTable("users", users$1);
-	writeTable("movements", movements);
-	writeTable("deals", deals$1);
-	writeTable("payrolls", payrolls$1);
-	writeTable("transactions", transactions$1);
-	writeTable("activities", activities);
-	writeTable("debt_payments", debtPayments);
-	writeTable("sales", sales);
-	writeTable("refunds", refunds);
 }
 /** ID generatori — ketma-ket chaqiruvlarda takrorlanmasligi kafolatlanadi. */
 var idCounter = Date.now();
@@ -4067,10 +4566,12 @@ var getSupplierProducts = (req, res) => {
 };
 /** Ta'minotchiga qaytarilgan mahsulotlar tarixi */
 var getSupplierReturns = (req, res) => {
-	if (!suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt)) return sendNotFound(res, "Ta'minotchi topilmadi");
+	const supplier = suppliers$1.find((s) => s.id === req.params.id && !s.deletedAt);
+	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
+	const returns = supplierReturns.filter((r) => r.supplierId === supplier.id);
 	res.json({
 		success: true,
-		data: []
+		data: returns
 	});
 };
 /** Ta'minotchi bilan moliyaviy hisob-kitoblar */
@@ -4162,19 +4663,55 @@ var returnProductSchema = z.object({
 });
 var returnProductToSupplier = (req, res) => {
 	const supplierId = req.params.id;
-	const supplier = suppliers$1.find((s) => s.id === supplierId && !s.deletedAt);
-	if (!supplier) return sendNotFound(res, "Ta'minotchi topilmadi");
-	const parsed = returnProductSchema.safeParse(req.body);
-	if (!parsed.success) return sendValidationError(res, parsed.error);
-	const { productId, quantity, reason, note } = parsed.data;
-	const product = products$1.find((p) => p.id === productId && !p.deletedAt);
-	if (!product) return sendNotFound(res, "Mahsulot topilmadi");
-	if (product.quantity < quantity) return res.status(400).json({
-		success: false,
-		message: `Omborda faqat ${product.quantity} ta mahsulot mavjud`
+	console.log("🔍 [Backend] returnProductToSupplier START:", {
+		supplierId,
+		body: req.body,
+		bodyType: typeof req.body
 	});
+	const supplier = suppliers$1.find((s) => s.id === supplierId && !s.deletedAt);
+	if (!supplier) {
+		console.error("❌ [Backend] Supplier not found:", supplierId);
+		return sendNotFound(res, "Ta'minotchi topilmadi");
+	}
+	const parsed = returnProductSchema.safeParse(req.body);
+	if (!parsed.success) {
+		console.error("❌ [Backend] Validation failed:", parsed.error);
+		return sendValidationError(res, parsed.error);
+	}
+	const { productId, quantity, reason, note } = parsed.data;
+	console.log("✅ [Backend] Parsed data:", {
+		productId,
+		quantity,
+		quantityType: typeof quantity,
+		reason,
+		note
+	});
+	const product = products$1.find((p) => p.id === productId && !p.deletedAt);
+	if (!product) {
+		console.error("❌ [Backend] Product not found:", productId);
+		return sendNotFound(res, "Mahsulot topilmadi");
+	}
+	console.log("📦 [Backend] Product found:", {
+		productId: product.id,
+		productName: product.name,
+		currentQuantity: product.quantity,
+		quantityType: typeof product.quantity,
+		returningQuantity: quantity
+	});
+	if (product.quantity < quantity) {
+		console.error("❌ [Backend] Insufficient stock:", {
+			available: product.quantity,
+			requested: quantity
+		});
+		return res.status(400).json({
+			success: false,
+			message: `Omborda faqat ${product.quantity} ta mahsulot mavjud`
+		});
+	}
+	const returnNumber = `RET-${nextId()}`;
 	const returnRecord = {
 		id: nextId(),
+		returnNumber,
 		supplierId,
 		supplierName: supplier.name,
 		productId,
@@ -4188,7 +4725,19 @@ var returnProductToSupplier = (req, res) => {
 		purchaseNumber: "AUTO",
 		createdAt: (/* @__PURE__ */ new Date()).toISOString()
 	};
+	supplierReturns.unshift(returnRecord);
+	console.log("💾 [Backend] Return record saved:", returnNumber);
+	const oldQuantity = product.quantity;
 	product.quantity -= quantity;
+	const newQuantity = product.quantity;
+	console.log("✅ [Backend] Product quantity updated:", {
+		productId: product.id,
+		oldQuantity,
+		returningQuantity: quantity,
+		newQuantity,
+		calculation: `${oldQuantity} - ${quantity} = ${newQuantity}`
+	});
+	console.log("✅ [Backend] returnProductToSupplier COMPLETE");
 	res.json({
 		success: true,
 		data: returnRecord,
@@ -5235,7 +5784,7 @@ function clientIp(req) {
 	return req.socket.remoteAddress ?? "—";
 }
 /** Bitta audit yozuvini bazaga qo'shadi. */
-function recordAudit(entry) {
+async function recordAudit(entry) {
 	const log = {
 		id: (++auditIdCounter).toString(),
 		userId: entry.user.id,
@@ -5248,6 +5797,10 @@ function recordAudit(entry) {
 		ipAddress: entry.ip,
 		timestamp: (/* @__PURE__ */ new Date()).toISOString()
 	};
+	if (USE_POSTGRES) {
+		await pgInsertAuditLog(log);
+		return;
+	}
 	db().prepare(`INSERT INTO audit_logs
        (id, userId, userName, userRole, action, entity, entityId, summary, ipAddress, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(log.id, log.userId, log.userName, log.userRole, log.action, log.entity, log.entityId, log.summary, log.ipAddress, log.timestamp);
@@ -5272,7 +5825,7 @@ var changePasswordSchema = z.object({
 	currentPassword: z.string().min(1, "joriy parol kiritilishi shart"),
 	newPassword: passwordSchema$1
 });
-var login = (req, res) => {
+var login = async (req, res) => {
 	try {
 		console.log("📨 Login request received");
 		console.log("📦 Request body:", req.body ? "exists" : "undefined/null");
@@ -5383,7 +5936,7 @@ var login = (req, res) => {
 			});
 		}
 		try {
-			recordAudit({
+			await recordAudit({
 				user,
 				action: "login",
 				entity: "auth",
@@ -5420,9 +5973,9 @@ var login = (req, res) => {
 		});
 	}
 };
-var logout = (req, res) => {
+var logout = async (req, res) => {
 	const token = extractToken(req.headers.authorization);
-	if (token) destroySession(token);
+	if (token) await destroySession(token);
 	res.json({
 		success: true,
 		data: null,
@@ -5466,7 +6019,7 @@ var getCurrentUser = (req, res) => {
 	};
 	res.json(response);
 };
-var changePassword = (req, res) => {
+var changePassword = async (req, res) => {
 	const parsed = changePasswordSchema.safeParse(req.body);
 	if (!parsed.success) return sendValidationError(res, parsed.error);
 	const user = req.currentUser;
@@ -5479,7 +6032,7 @@ var changePassword = (req, res) => {
 		message: "Joriy parol noto'g'ri"
 	});
 	user.passwordHash = hashPassword(parsed.data.newPassword);
-	destroyUserSessions(user.id);
+	await destroyUserSessions(user.id);
 	logActivity({
 		action: "Parol o'zgartirildi",
 		details: user.name,
@@ -5626,7 +6179,7 @@ var createUser = (req, res) => {
 	};
 	res.status(201).json(response);
 };
-var updateUser = (req, res) => {
+var updateUser = async (req, res) => {
 	const parsed = userSchema.partial().safeParse(req.body);
 	if (!parsed.success) return sendValidationError(res, parsed.error);
 	const user = users$1.find((u) => u.id === req.params.id && !u.deletedAt);
@@ -5649,9 +6202,9 @@ var updateUser = (req, res) => {
 	Object.assign(user, fields);
 	if (password) {
 		user.passwordHash = hashPassword(password);
-		destroyUserSessions(user.id);
+		await destroyUserSessions(user.id);
 	}
-	if (fields.status === "suspended") destroyUserSessions(user.id);
+	if (fields.status === "suspended") await destroyUserSessions(user.id);
 	logActivity({
 		action: "Foydalanuvchi yangilandi",
 		details: `${user.name} · ${user.role}`,
@@ -5664,7 +6217,7 @@ var updateUser = (req, res) => {
 	};
 	res.json(response);
 };
-var deleteUser = (req, res) => {
+var deleteUser = async (req, res) => {
 	const user = users$1.find((u) => u.id === req.params.id && !u.deletedAt);
 	if (!user) return sendNotFound(res, "Foydalanuvchi topilmadi");
 	if (user.role === "admin") {
@@ -5674,7 +6227,7 @@ var deleteUser = (req, res) => {
 		});
 	}
 	softRemove(users$1, user.id);
-	destroyUserSessions(user.id);
+	await destroyUserSessions(user.id);
 	logActivity({
 		action: "Foydalanuvchi o'chirildi",
 		details: user.name,
@@ -5898,9 +6451,29 @@ var querySchema$2 = paginationSchema.extend({
 	from: z.string().optional(),
 	to: z.string().optional()
 });
-var getAuditLogs = (req, res) => {
+var getAuditLogs = async (req, res) => {
 	const query = querySchema$2.parse(req.query);
 	const search = query.search.toLowerCase();
+	const to = query.to ? query.to + "T23:59:59.999Z" : void 0;
+	if (USE_POSTGRES) {
+		const { rows, total, page, pages } = await pgQueryAuditLogs({
+			action: query.action,
+			userId: query.userId,
+			from: query.from,
+			to,
+			search
+		}, query.page, query.limit);
+		res.json({
+			data: rows,
+			pagination: {
+				page,
+				limit: query.limit,
+				total,
+				pages
+			}
+		});
+		return;
+	}
 	const clauses = [];
 	const params = [];
 	if (query.action) {
@@ -5915,9 +6488,9 @@ var getAuditLogs = (req, res) => {
 		clauses.push("timestamp >= ?");
 		params.push(query.from);
 	}
-	if (query.to) {
+	if (to) {
 		clauses.push("timestamp <= ?");
-		params.push(query.to + "T23:59:59.999Z");
+		params.push(to);
 	}
 	if (search) {
 		clauses.push("(LOWER(userName) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(entity) LIKE ?)");
@@ -5941,7 +6514,15 @@ var getAuditLogs = (req, res) => {
 		}
 	});
 };
-var getAuditStats = (_req, res) => {
+var getAuditStats = async (_req, res) => {
+	if (USE_POSTGRES) {
+		const data = await pgAuditStats();
+		res.json({
+			success: true,
+			data
+		});
+		return;
+	}
 	const instance = db();
 	const count = (sql, ...p) => instance.prepare(sql).get(...p).n;
 	const todayStart = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
@@ -6523,7 +7104,7 @@ function validateEnvironment() {
 }
 function createServer() {
 	validateEnvironment();
-	purgeExpiredSessions();
+	purgeExpiredSessions().catch((error) => logger.error("Muddati o'tgan sessiyalarni tozalashda xatolik:", error));
 	startBackupScheduler();
 	const app = express();
 	app.use(helmet({
@@ -6547,6 +7128,18 @@ function createServer() {
 		},
 		credentials: true
 	}));
+	/**
+	* Ma'lumotlar ombori tayyor ekanini kafolatlaydi va (PostgreSQL rejimida)
+	* har bir so'rov boshida boshqa serverless instance'lar yozgan eng so'nggi
+	* holatni qayta yuklaydi. Vercel'da har bir konteynerning o'z vaqtinchalik
+	* xotirasi bor va ular bir-birining yozganini avtomatik ko'rmaydi — shu
+	* sabab masalan mahsulot qoldig'i turli so'rovlarda turlicha ko'rinardi.
+	* Mahalliy SQLite rejimida `reloadStore` hech narsa qilmaydi (keraksiz).
+	* CORS'dan keyin turadi — shu tufayli xatolik javobi ham to'g'ri header bilan boradi.
+	*/
+	app.use((req, res, next) => {
+		ensureStoreReady().then(() => reloadStore()).then(() => next()).catch((error) => next(error));
+	});
 	const limiter = rateLimit({
 		windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"),
 		max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100"),
@@ -6601,20 +7194,41 @@ function createServer() {
 		});
 	});
 	/**
-	* Ma'lumotni o'zgartirgan har bir muvaffaqiyatli so'rovdan keyin holat bazaga yoziladi.
-	* Javob yuborilgach ishga tushadi — foydalanuvchi saqlashni kutib turmaydi.
-	* Bitta joyda turgani uchun hech bir route uni chaqirishni unutib qo'ymaydi.
+	* Ma'lumotni o'zgartiradigan har bir muvaffaqiyatli so'rovdan keyin holat
+	* bazaga yoziladi va (autentifikatsiya qilingan /api so'rovlar uchun) audit
+	* jurnaliga yozuv qo'shiladi — javob mijozga jo'natilishidan OLDIN.
+	*
+	* Muhim: Vercel javob jo'natilgach funksiya jarayonini darhol to'xtatib
+	* qo'yishi mumkin, shuning uchun "javobdan keyin fon vazifasi" ishonchli
+	* emas — saqlash tugamaguncha javob jo'natilmaydi. Bitta joyda turgani
+	* uchun hech bir route buni chaqirishni unutib qo'ymaydi.
 	*/
 	app.use((req, res, next) => {
 		if (req.method === "GET" || req.method === "HEAD") return next();
-		res.on("finish", () => {
-			if (res.statusCode >= 400) return;
-			try {
-				persist();
-			} catch (error) {
+		const originalEnd = res.end.bind(res);
+		let finalizing = false;
+		res.end = (...args) => {
+			if (finalizing || res.statusCode >= 400) return originalEnd(...args);
+			finalizing = true;
+			const shouldAudit = req.path.startsWith("/api") && !req.path.startsWith("/api/audit") && !!req.currentUser;
+			Promise.resolve().then(() => persist()).then(() => {
+				if (!shouldAudit) return;
+				const apiPath = req.originalUrl.replace(/^\/api/, "").split("?")[0];
+				return recordAudit({
+					user: req.currentUser,
+					action: auditActionFor(req.method),
+					entity: auditEntityFor(apiPath),
+					entityId: extractIdFromPath(apiPath),
+					summary: auditSummary(req.method, apiPath),
+					ip: clientIp(req)
+				});
+			}).catch((error) => {
 				console.error("Bazaga saqlashda xatolik:", error);
-			}
-		});
+			}).finally(() => {
+				originalEnd(...args);
+			});
+			return res;
+		};
 		next();
 	});
 	app.get("/health", (_req, res) => {
@@ -6638,34 +7252,6 @@ function createServer() {
 	* ulashni unutib qo'yish mumkin emas.
 	*/
 	app.use("/api", requireAuth);
-	/**
-	* Audit-log middleware (TZ 14-bo'lim).
-	* `requireAuth` dan keyin turadi — foydalanuvchi ma'lum. Har bir muvaffaqiyatli
-	* o'zgartiruvchi so'rov (POST/PUT/PATCH/DELETE) kim/qachon/IP bilan yoziladi.
-	* Yo'l va metoddan avtomatik inson o'qiy oladigan tavsif quriladi.
-	*/
-	app.use("/api", (req, res, next) => {
-		if (["GET", "HEAD"].includes(req.method)) return next();
-		if (req.path.startsWith("/audit")) return next();
-		const ip = clientIp(req);
-		res.on("finish", () => {
-			if (res.statusCode >= 400 || !req.currentUser) return;
-			try {
-				const apiPath = req.originalUrl.replace(/^\/api/, "").split("?")[0];
-				recordAudit({
-					user: req.currentUser,
-					action: auditActionFor(req.method),
-					entity: auditEntityFor(apiPath),
-					entityId: extractIdFromPath(apiPath),
-					summary: auditSummary(req.method, apiPath),
-					ip
-				});
-			} catch (error) {
-				console.error("Audit yozishda xatolik:", error);
-			}
-		});
-		next();
-	});
 	app.get("/api/auth/me", getCurrentUser);
 	app.use("/api/sales", requireModule("sales"));
 	app.get("/api/sales/stats", getSalesStats);

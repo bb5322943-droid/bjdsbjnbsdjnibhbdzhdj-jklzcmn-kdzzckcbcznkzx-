@@ -1,6 +1,7 @@
 import { Request } from "express";
 import { AuditAction, AuditLog, StoredUser } from "@shared/api";
-import { db } from "../data/db";
+import { db, USE_POSTGRES } from "../data/db";
+import { pgInsertAuditLog } from "../data/db-postgres";
 
 /**
  * Audit-log — TZ 14-bo'lim: har bir yaratish/tahrirlash/o'chirish amali kim,
@@ -22,14 +23,14 @@ export function clientIp(req: Request): string {
 }
 
 /** Bitta audit yozuvini bazaga qo'shadi. */
-export function recordAudit(entry: {
+export async function recordAudit(entry: {
   user: StoredUser;
   action: AuditAction;
   entity: string;
   entityId?: string;
   summary: string;
   ip: string;
-}): void {
+}): Promise<void> {
   const log: AuditLog = {
     id: (++auditIdCounter).toString(),
     userId: entry.user.id,
@@ -42,6 +43,11 @@ export function recordAudit(entry: {
     ipAddress: entry.ip,
     timestamp: new Date().toISOString(),
   };
+
+  if (USE_POSTGRES) {
+    await pgInsertAuditLog(log);
+    return;
+  }
 
   db()
     .prepare(

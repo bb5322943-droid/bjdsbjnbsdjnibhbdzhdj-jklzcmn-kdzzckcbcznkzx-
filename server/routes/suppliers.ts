@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import { z } from "zod";
 import { ApiResponse, Supplier, SupplierStats } from "@shared/api";
-import { active, logActivity, nextId, products, softRemove, suppliers, purchases, persist, supplierReturns } from "../data/store";
+import { active, logActivity, nextId, products, softRemove, suppliers, purchases, supplierReturns } from "../data/store";
 import { supplierStats } from "../data/metrics";
 import {
   paginate,
@@ -494,15 +494,8 @@ export const returnProductToSupplier: RequestHandler = (req, res) => {
     calculation: `${oldQuantity} - ${quantity} = ${newQuantity}`,
   });
 
-  // CRITICAL: Immediately persist to database to ensure changes are saved
-  // This is especially important for Vercel serverless where /tmp is ephemeral
-  try {
-    persist();
-    console.log('💾 [Backend] Data persisted to database');
-  } catch (persistError) {
-    console.error("❌ [Backend] Failed to persist product return:", persistError);
-    // Still return success since the in-memory change was made
-  }
+  // Saqlash markazlashtirilgan middleware orqali (server/index.ts) — javob
+  // jo'natilishidan oldin, avtomatik ravishda amalga oshadi.
 
   console.log('✅ [Backend] returnProductToSupplier COMPLETE');
 

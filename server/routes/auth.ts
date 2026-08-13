@@ -44,7 +44,7 @@ const changePasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
-export const login: RequestHandler = (req, res) => {
+export const login: RequestHandler = async (req, res) => {
   try {
     // 1. Request body tekshirish
     console.log("📨 Login request received");
@@ -181,7 +181,7 @@ export const login: RequestHandler = (req, res) => {
 
     // 8. Audit logging
     try {
-      recordAudit({
+      await recordAudit({
         user,
         action: "login",
         entity: "auth",
@@ -223,9 +223,9 @@ export const login: RequestHandler = (req, res) => {
   }
 };
 
-export const logout: RequestHandler = (req, res) => {
+export const logout: RequestHandler = async (req, res) => {
   const token = extractToken(req.headers.authorization);
-  if (token) destroySession(token);
+  if (token) await destroySession(token);
 
   res.json({ success: true, data: null, message: "Tizimdan chiqdingiz" });
 };
@@ -265,7 +265,7 @@ export const getCurrentUser: RequestHandler = (req, res) => {
   res.json(response);
 };
 
-export const changePassword: RequestHandler = (req, res) => {
+export const changePassword: RequestHandler = async (req, res) => {
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) return sendValidationError(res, parsed.error);
 
@@ -283,7 +283,7 @@ export const changePassword: RequestHandler = (req, res) => {
   user.passwordHash = hashPassword(parsed.data.newPassword);
 
   // Parol o'zgargach boshqa qurilmalardagi sessiyalar bekor qilinadi.
-  destroyUserSessions(user.id);
+  await destroyUserSessions(user.id);
 
   logActivity({
     action: "Parol o'zgartirildi",

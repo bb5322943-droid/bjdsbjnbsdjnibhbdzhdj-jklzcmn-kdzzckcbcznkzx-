@@ -1,6 +1,13 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import jwt from "jsonwebtoken";
-import { db } from "../data/db";
+import { db, USE_POSTGRES } from "../data/db";
+import {
+  pgInsertSession,
+  pgGetSession,
+  pgDeleteSessionByToken,
+  pgDeleteSessionsByUser,
+  pgDeleteExpiredSessions,
+} from "../data/db-postgres";
 
 /**
  * Parol va sessiya boshqaruvi JWT bilan.
@@ -66,16 +73,20 @@ export function createAccessToken(payload: TokenPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
-export function createRefreshToken(userId: string): string {
+export async function createRefreshToken(userId: string): Promise<string> {
   const token = jwt.sign({ userId, type: "refresh" }, JWT_REFRESH_SECRET, {
     expiresIn: JWT_REFRESH_EXPIRES_IN,
   });
 
   // Refresh tokenni bazaga yozamiz
   const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 kun
-  db()
-    .prepare("INSERT INTO sessions (token, userId, expiresAt) VALUES (?, ?, ?)")
-    .run(token, userId, expiresAt);
+  if (USE_POSTGRES) {
+    await pgInsertSession(token, userId, expiresAt);
+  } else {
+    db()
+      .prepare("INSERT INTO sessions (token, userId, expiresAt) VALUES (?, ?, ?)")
+      .run(token, userId, expiresAt);
+  }
 
   return token;
 }
@@ -89,18 +100,20 @@ export function verifyAccessToken(token: string): TokenPayload | null {
   }
 }
 
-export function verifyRefreshToken(token: string): string | null {
+export async function verifyRefreshToken(token: string): Promise<string | null> {
   try {
     const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string; type: string };
     if (decoded.type !== "refresh") return null;
 
     // Bazada borligini tekshiramiz
-    const row = db()
-      .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
-      .get(token) as { userId: string; expiresAt: number } | undefined;
+    const row = USE_POSTGRES
+      ? await pgGetSession(token)
+      : (db()
+          .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
+          .get(token) as { userId: string; expiresAt: number } | undefined);
 
     if (!row || row.expiresAt < Date.now()) {
-      if (row) destroySession(token);
+      if (row) await destroySession(token);
       return null;
     }
 
@@ -115,26 +128,33 @@ export function verifyRefreshToken(token: string): string | null {
  */
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 soat
 
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
   const token = randomBytes(32).toString("hex");
-  db()
-    .prepare("INSERT INTO sessions (token, userId, expiresAt) VALUES (?, ?, ?)")
-    .run(token, userId, Date.now() + SESSION_TTL_MS);
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  if (USE_POSTGRES) {
+    await pgInsertSession(token, userId, expiresAt);
+  } else {
+    db()
+      .prepare("INSERT INTO sessions (token, userId, expiresAt) VALUES (?, ?, ?)")
+      .run(token, userId, expiresAt);
+  }
   return token;
 }
 
 /** Token bo'yicha foydalanuvchi ID sini qaytaradi; muddati o'tgan bo'lsa null. */
-export function resolveSession(token: string): string | null {
+export async function resolveSession(token: string): Promise<string | null> {
   console.log("🔍 resolveSession called");
   console.log("   Token:", token ? `${token.substring(0, 10)}...` : "null");
-  
+
   try {
-    const row = db()
-      .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
-      .get(token) as { userId: string; expiresAt: number } | undefined;
+    const row = USE_POSTGRES
+      ? await pgGetSession(token)
+      : (db()
+          .prepare("SELECT userId, expiresAt FROM sessions WHERE token = ?")
+          .get(token) as { userId: string; expiresAt: number } | undefined);
 
     console.log("   Session row from DB:", row ? "found" : "not found");
-    
+
     if (!row) {
       console.log("   ❌ Session not found in database");
       return null;
@@ -147,7 +167,7 @@ export function resolveSession(token: string): string | null {
     console.log("   Expired:", expired);
 
     if (expired) {
-      destroySession(token);
+      await destroySession(token);
       console.log("   ❌ Session expired and deleted");
       return null;
     }
@@ -160,18 +180,30 @@ export function resolveSession(token: string): string | null {
   }
 }
 
-export function destroySession(token: string): void {
-  db().prepare("DELETE FROM sessions WHERE token = ?").run(token);
+export async function destroySession(token: string): Promise<void> {
+  if (USE_POSTGRES) {
+    await pgDeleteSessionByToken(token);
+  } else {
+    db().prepare("DELETE FROM sessions WHERE token = ?").run(token);
+  }
 }
 
 /** Foydalanuvchining barcha sessiyalarini bekor qiladi (o'chirilganda/bloklanganda). */
-export function destroyUserSessions(userId: string): void {
-  db().prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
+export async function destroyUserSessions(userId: string): Promise<void> {
+  if (USE_POSTGRES) {
+    await pgDeleteSessionsByUser(userId);
+  } else {
+    db().prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
+  }
 }
 
 /** Muddati o'tgan sessiyalarni tozalaydi — server ishga tushganda chaqiriladi. */
-export function purgeExpiredSessions(): void {
-  db().prepare("DELETE FROM sessions WHERE expiresAt < ?").run(Date.now());
+export async function purgeExpiredSessions(): Promise<void> {
+  if (USE_POSTGRES) {
+    await pgDeleteExpiredSessions();
+  } else {
+    db().prepare("DELETE FROM sessions WHERE expiresAt < ?").run(Date.now());
+  }
 }
 
 /** So'rov sarlavhasidan Bearer tokenni ajratadi. */

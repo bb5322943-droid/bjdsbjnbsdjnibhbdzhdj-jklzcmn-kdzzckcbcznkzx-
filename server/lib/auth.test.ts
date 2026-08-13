@@ -87,21 +87,21 @@ describe("Auth", () => {
       expect(decoded).toBeNull();
     });
 
-    it("refresh token yaratadi va bazaga yozadi", () => {
-      const token = createRefreshToken(mockPayload.userId);
+    it("refresh token yaratadi va bazaga yozadi", async () => {
+      const token = await createRefreshToken(mockPayload.userId);
       expect(token).toBeTruthy();
       expect(typeof token).toBe("string");
     });
 
-    it("refresh token'ni verify qiladi", () => {
-      const token = createRefreshToken(mockPayload.userId);
-      const userId = verifyRefreshToken(token);
+    it("refresh token'ni verify qiladi", async () => {
+      const token = await createRefreshToken(mockPayload.userId);
+      const userId = await verifyRefreshToken(token);
 
       expect(userId).toBe(mockPayload.userId);
     });
 
-    it("noto'g'ri refresh token'ni rad etadi", () => {
-      const userId = verifyRefreshToken("invalid-token");
+    it("noto'g'ri refresh token'ni rad etadi", async () => {
+      const userId = await verifyRefreshToken("invalid-token");
       expect(userId).toBeNull();
     });
   });

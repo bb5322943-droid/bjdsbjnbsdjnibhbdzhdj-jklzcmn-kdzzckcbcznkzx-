@@ -140,7 +140,7 @@ export const createUser: RequestHandler = (req, res) => {
   res.status(201).json(response);
 };
 
-export const updateUser: RequestHandler = (req, res) => {
+export const updateUser: RequestHandler = async (req, res) => {
   const parsed = userSchema.partial().safeParse(req.body);
   if (!parsed.success) return sendValidationError(res, parsed.error);
 
@@ -192,10 +192,10 @@ export const updateUser: RequestHandler = (req, res) => {
   // Administrator parolni qayta o'rnatsa, eski sessiyalar bekor qilinadi.
   if (password) {
     user.passwordHash = hashPassword(password);
-    destroyUserSessions(user.id);
+    await destroyUserSessions(user.id);
   }
   // Hisob to'xtatilsa ham foydalanuvchi darhol tizimdan chiqarilishi kerak.
-  if (fields.status === "suspended") destroyUserSessions(user.id);
+  if (fields.status === "suspended") await destroyUserSessions(user.id);
 
   logActivity({
     action: "Foydalanuvchi yangilandi",
@@ -211,7 +211,7 @@ export const updateUser: RequestHandler = (req, res) => {
   res.json(response);
 };
 
-export const deleteUser: RequestHandler = (req, res) => {
+export const deleteUser: RequestHandler = async (req, res) => {
   const user = users.find((u) => u.id === req.params.id && !u.deletedAt);
   if (!user) return sendNotFound(res, "Foydalanuvchi topilmadi");
 
@@ -229,7 +229,7 @@ export const deleteUser: RequestHandler = (req, res) => {
 
   softRemove(users, user.id);
   // O'chirilgan hisob egasi ochiq turgan sessiyasi bilan ishlashda davom etmasin.
-  destroyUserSessions(user.id);
+  await destroyUserSessions(user.id);
 
   logActivity({
     action: "Foydalanuvchi o'chirildi",

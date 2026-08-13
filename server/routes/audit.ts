@@ -2,7 +2,8 @@ import { RequestHandler } from "express";
 import { SQLInputValue } from "node:sqlite";
 import { z } from "zod";
 import { AuditAction, AuditLog, AuditStats } from "@shared/api";
-import { db } from "../data/db";
+import { db, USE_POSTGRES } from "../data/db";
+import { pgQueryAuditLogs, pgAuditStats } from "../data/db-postgres";
 import { paginationSchema } from "../lib/http";
 
 /** HTTP metodini audit amaliga aylantiradi. */
@@ -82,9 +83,23 @@ const querySchema = paginationSchema.extend({
   to: z.string().optional(),
 });
 
-export const getAuditLogs: RequestHandler = (req, res) => {
+export const getAuditLogs: RequestHandler = async (req, res) => {
   const query = querySchema.parse(req.query);
   const search = query.search.toLowerCase();
+  const to = query.to ? query.to + "T23:59:59.999Z" : undefined;
+
+  if (USE_POSTGRES) {
+    const { rows, total, page, pages } = await pgQueryAuditLogs(
+      { action: query.action, userId: query.userId, from: query.from, to, search },
+      query.page,
+      query.limit,
+    );
+    res.json({
+      data: rows,
+      pagination: { page, limit: query.limit, total, pages },
+    });
+    return;
+  }
 
   const clauses: string[] = [];
   const params: SQLInputValue[] = [];
@@ -100,9 +115,9 @@ export const getAuditLogs: RequestHandler = (req, res) => {
     clauses.push("timestamp >= ?");
     params.push(query.from);
   }
-  if (query.to) {
+  if (to) {
     clauses.push("timestamp <= ?");
-    params.push(query.to + "T23:59:59.999Z");
+    params.push(to);
   }
   if (search) {
     clauses.push("(LOWER(userName) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(entity) LIKE ?)");
@@ -135,7 +150,13 @@ export const getAuditLogs: RequestHandler = (req, res) => {
   });
 };
 
-export const getAuditStats: RequestHandler = (_req, res) => {
+export const getAuditStats: RequestHandler = async (_req, res) => {
+  if (USE_POSTGRES) {
+    const data: AuditStats = await pgAuditStats();
+    res.json({ success: true, data });
+    return;
+  }
+
   const instance = db();
   const count = (sql: string, ...p: SQLInputValue[]) =>
     (instance.prepare(sql).get(...p) as { n: number }).n;
