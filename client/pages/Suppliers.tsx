@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PackageX, Plus, RotateCcw, Star, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Supplier } from "@shared/api";
 import {
@@ -76,6 +77,7 @@ function Rating({ value }: { value: number }) {
 
 export default function Suppliers() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const [status, setStatus] = useState(ALL);
