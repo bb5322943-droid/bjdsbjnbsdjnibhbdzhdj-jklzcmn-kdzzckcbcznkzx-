@@ -141,7 +141,14 @@ var handleDemo = (req, res) => {
 * SQLite orqali doimiy saqlash qatlami.
 * Production uchun PostgreSQL tavsiya etiladi (db-postgres.ts).
 */
-var USE_POSTGRES = !!process.env.DATABASE_URL && (process.env.DATABASE_URL.startsWith("postgresql://") || process.env.DATABASE_URL.startsWith("postgres://"));
+/**
+* Postgres ulanish satri. `NEON_DATABASE_URL` ustuvor — Vercel Marketplace
+* orqali ulangan Neon integratsiyasi shu nomda beradi (loyihada avvaldan
+* mavjud `DATABASE_URL` esa ishlamaydigan placeholder bo'lib chiqqan edi,
+* shuning uchun uni o'chirmasdan, ustidan ustuvorroq manba qo'shildi).
+*/
+var POSTGRES_CONNECTION_STRING = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+var USE_POSTGRES = !!POSTGRES_CONNECTION_STRING && (POSTGRES_CONNECTION_STRING.startsWith("postgresql://") || POSTGRES_CONNECTION_STRING.startsWith("postgres://"));
 if (USE_POSTGRES) logger.info("Using PostgreSQL database");
 else logger.info("Using SQLite database");
 var IS_VERCEL = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
@@ -783,7 +790,7 @@ types.setTypeParser(1700, (value) => parseFloat(value));
 var pool = null;
 function initPostgres() {
 	if (pool) return;
-	const connectionString = process.env.DATABASE_URL;
+	const connectionString = POSTGRES_CONNECTION_STRING;
 	if (!connectionString) throw new Error("DATABASE_URL environment variable not set");
 	pool = new Pool({
 		connectionString,

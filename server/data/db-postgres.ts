@@ -1,6 +1,6 @@
 import { Pool, PoolClient, types } from "pg";
 import { logger } from "../lib/logger";
-import { TABLES, TableName } from "./db";
+import { TABLES, TableName, POSTGRES_CONNECTION_STRING } from "./db";
 
 /**
  * PostgreSQL adapter — Vercel serverless muhitida ma'lumotlar barqaror
@@ -21,7 +21,7 @@ let pool: Pool | null = null;
 export function initPostgres(): void {
   if (pool) return;
 
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = POSTGRES_CONNECTION_STRING;
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable not set");
   }
