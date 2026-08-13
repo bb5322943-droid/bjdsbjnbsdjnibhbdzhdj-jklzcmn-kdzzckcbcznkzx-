@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { applyQuantityCache, setCachedQuantity } from "@/utils/product-cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -136,7 +137,7 @@ export default function SupplierDetail() {
     returnsCount: 0,
   };
   const purchases = purchasesData?.data || [];
-  const products = productsData?.data || [];
+  const products = applyQuantityCache(productsData?.data || []);
   const returns = returnsData?.data || [];
   const financial = financialData?.data || { summary: { totalPaid: 0, currentDebt: 0 }, history: [] };
 
@@ -147,6 +148,18 @@ export default function SupplierDetail() {
     note: string;
   }) => {
     try {
+      // Find the product to get current quantity
+      const product = products.find(p => p.id === data.productId);
+      if (!product) {
+        toast.error("Mahsulot topilmadi");
+        return;
+      }
+
+      const newQuantity = product.quantity - data.quantity;
+
+      // Save to localStorage cache immediately
+      setCachedQuantity(data.productId, newQuantity);
+
       // Optimistic update: immediately update UI
       queryClient.setQueryData(
         ['supplier-products', id],
@@ -156,7 +169,7 @@ export default function SupplierDetail() {
             ...old,
             data: old.data.map((p: SupplierProduct) =>
               p.id === data.productId
-                ? { ...p, quantity: p.quantity - data.quantity }
+                ? { ...p, quantity: newQuantity }
                 : p
             ),
           };
@@ -166,7 +179,7 @@ export default function SupplierDetail() {
       await returnMutation.mutateAsync({ id: id!, ...data });
       
       toast.success("Mahsulot qaytarildi!", {
-        description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi`,
+        description: `${data.quantity} ta mahsulot ta'minotchiga qaytarildi. Qolgan: ${newQuantity} ta`,
       });
       
       // Mahsulotlar ro'yxatini yangilash

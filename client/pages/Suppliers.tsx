@@ -25,6 +25,7 @@ import {
   ViewMode,
   ViewToggle,
 } from "@/components/PageKit";
+import { applyQuantityCache, setCachedQuantity } from "@/utils/product-cache";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
@@ -110,7 +111,7 @@ export default function Suppliers() {
   const suppliers = data?.data ?? [];
   const pagination = data?.pagination;
   const categories = categoriesData?.data ?? [];
-  const products = productsData?.data ?? [];
+  const products = applyQuantityCache(productsData?.data ?? []);
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -142,6 +143,18 @@ export default function Suppliers() {
     if (!returningProduct) return;
     
     try {
+      // Find the product to get current quantity
+      const product = products.find(p => p.id === data.productId);
+      if (!product) {
+        toast.error("Mahsulot topilmadi");
+        return;
+      }
+
+      const newQuantity = product.quantity - data.quantity;
+
+      // Save to localStorage cache immediately
+      setCachedQuantity(data.productId, newQuantity);
+
       // Optimistic update: immediately update product quantity in cache
       const supplierProductsKey = ['supplier-products', returningProduct.id];
       queryClient.setQueryData(
@@ -152,7 +165,7 @@ export default function Suppliers() {
             ...old,
             data: old.data.map((p: any) =>
               p.id === data.productId
-                ? { ...p, quantity: p.quantity - data.quantity }
+                ? { ...p, quantity: newQuantity }
                 : p
             ),
           };
@@ -164,7 +177,6 @@ export default function Suppliers() {
         ...data,
       });
       
-      const product = products.find(p => p.id === data.productId);
       const reasonLabels: Record<string, string> = {
         defective: "Nuqsonli mahsulot",
         wrong_item: "Noto'g'ri mahsulot",
@@ -175,9 +187,9 @@ export default function Suppliers() {
       };
       
       toast.success(
-        `${returningProduct.name}ga "${product?.name}" (${data.quantity} ta) qaytarildi`,
+        `${returningProduct.name}ga "${product.name}" (${data.quantity} ta) qaytarildi`,
         {
-          description: `Sabab: ${reasonLabels[data.reason]}`,
+          description: `Sabab: ${reasonLabels[data.reason]}. Qolgan: ${newQuantity} ta`,
         }
       );
       
