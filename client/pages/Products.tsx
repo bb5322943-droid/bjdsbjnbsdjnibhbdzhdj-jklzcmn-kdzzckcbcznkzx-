@@ -53,6 +53,7 @@ import {
   useWarehouseStats,
   useOrders,
   useCustomers,
+  usePurchases,
 } from "@/hooks/use-api";
 import { useDebounced } from "@/hooks/use-debounced";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,6 +84,7 @@ export default function Products() {
   const { data: filtersData } = useProductFilters();
   const { data: ordersData } = useOrders({ page: 1, limit: 1000 }); // Barcha buyurtmalar
   const { data: customersData } = useCustomers({ page: 1, limit: 1000 }); // Barcha mijozlar
+  const { data: purchasesData } = usePurchases({ page: 1, limit: 1000 }); // Barcha xaridlar
   const { data, isLoading, isError, error, refetch } = useProducts({
     page,
     limit: 10,
@@ -104,6 +106,7 @@ export default function Products() {
   const movements = movementsData?.data ?? [];
   const allOrders = ordersData?.data ?? [];
   const allCustomers = customersData?.data ?? [];
+  const allPurchases = purchasesData?.data ?? [];
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -739,6 +742,13 @@ export default function Products() {
                 const customer = allCustomers.find(
                   (c) => c.id === order.customerId
                 );
+                
+                // Xarid narxini topish (eng so'nggi purchase dan)
+                const purchaseItem = allPurchases
+                  .flatMap(p => p.items || [])
+                  .filter(item => item.productId === historyProduct.id)
+                  .sort((a, b) => new Date(b.purchaseDate || 0).getTime() - new Date(a.purchaseDate || 0).getTime())[0];
+                
                 return {
                   orderNumber: order.orderNumber,
                   orderDate: order.orderDate,
@@ -746,6 +756,26 @@ export default function Products() {
                   price: orderItem?.price || 0,
                   total: (orderItem?.quantity || 0) * (orderItem?.price || 0),
                   customerName: customer?.name || "Noma'lum",
+                  costPrice: purchaseItem?.cost || 0,
+                };
+              })
+          }
+          purchases={
+            allPurchases
+              .filter((purchase) =>
+                purchase.items?.some((item) => item.productId === historyProduct.id)
+              )
+              .map((purchase) => {
+                const purchaseItem = purchase.items?.find(
+                  (item) => item.productId === historyProduct.id
+                );
+                return {
+                  purchaseNumber: purchase.purchaseNumber,
+                  purchaseDate: purchase.orderDate,
+                  supplierName: purchase.supplierName,
+                  quantity: purchaseItem?.quantity || 0,
+                  costPrice: purchaseItem?.cost || 0,
+                  total: (purchaseItem?.quantity || 0) * (purchaseItem?.cost || 0),
                 };
               })
           }
