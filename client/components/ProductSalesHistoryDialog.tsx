@@ -32,6 +32,13 @@ interface ProductPurchase {
   total: number;
 }
 
+interface ProductReturn {
+  returnDate: string;
+  purchaseNumber: string;
+  quantity: number;
+  reason: string;
+}
+
 interface ProductSalesHistoryDialogProps {
   open: boolean;
   onClose: () => void;
@@ -40,6 +47,7 @@ interface ProductSalesHistoryDialogProps {
   productCategory?: string;
   sales: ProductSale[];
   purchases: ProductPurchase[];
+  returns?: ProductReturn[];
 }
 
 export function ProductSalesHistoryDialog({
@@ -50,6 +58,7 @@ export function ProductSalesHistoryDialog({
   productCategory,
   sales,
   purchases,
+  returns = [],
 }: ProductSalesHistoryDialogProps) {
   // Sotish statistikasi
   const totalSales = sales.length;
@@ -61,7 +70,14 @@ export function ProductSalesHistoryDialog({
   const totalPurchases = purchases.length;
   const totalQuantityPurchased = purchases.reduce((sum, purchase) => sum + (purchase.quantity || 0), 0);
   const totalPurchaseAmount = purchases.reduce((sum, purchase) => sum + (purchase.total || 0), 0);
-  const avgCostPrice = totalQuantityPurchased > 0 ? totalPurchaseAmount / totalQuantityPurchased : 0;
+  
+  // Qaytarilgan mahsulotlar statistikasi
+  const totalReturns = returns.length;
+  const totalQuantityReturned = returns.reduce((sum, returnItem) => sum + (returnItem.quantity || 0), 0);
+  
+  // REAL xarid miqdori = sotib olingan - qaytarilgan
+  const netPurchaseQuantity = totalQuantityPurchased - totalQuantityReturned;
+  const avgCostPrice = netPurchaseQuantity > 0 ? totalPurchaseAmount / netPurchaseQuantity : 0;
   
   // Foyda hisoblash
   const totalProfit = totalSalesAmount - totalPurchaseAmount;
@@ -113,10 +129,15 @@ export function ProductSalesHistoryDialog({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Sotib olingan</p>
-                    <p className="text-2xl font-bold">{totalQuantityPurchased} ta</p>
+                    <p className="text-2xl font-bold">{netPurchaseQuantity} ta</p>
                     <p className="text-xs text-blue-600">
                       {formatNumber(totalPurchaseAmount)} so'm
                     </p>
+                    {totalQuantityReturned > 0 && (
+                      <p className="text-xs text-red-500 mt-0.5">
+                        -{totalQuantityReturned} ta qaytarilgan
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -162,14 +183,17 @@ export function ProductSalesHistoryDialog({
             </div>
           </div>
 
-          {/* Tabs: Sotish tarixi va Xarid tarixi */}
+          {/* Tabs: Sotish tarixi, Xarid tarixi va Qaytarishlar */}
           <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="sales">
                 Sotish tarixi ({totalSales})
               </TabsTrigger>
               <TabsTrigger value="purchases">
                 Xarid tarixi ({totalPurchases})
+              </TabsTrigger>
+              <TabsTrigger value="returns">
+                Qaytarishlar ({totalReturns})
               </TabsTrigger>
             </TabsList>
 
@@ -286,6 +310,53 @@ export function ProductSalesHistoryDialog({
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </TabsContent>
+
+            {/* Qaytarishlar tarixi */}
+            <TabsContent value="returns" className="mt-4">
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sana</TableHead>
+                      <TableHead>Xarid ID</TableHead>
+                      <TableHead className="text-right">Miqdor</TableHead>
+                      <TableHead>Sabab</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {returns.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          Hozircha qaytarilmagan
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      returns.map((returnItem, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="text-sm">{returnItem.returnDate}</TableCell>
+                          <TableCell className="font-medium">
+                            {returnItem.purchaseNumber}
+                          </TableCell>
+                          <TableCell className="text-right text-red-600 font-semibold">
+                            -{returnItem.quantity || 0} ta
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {returnItem.reason}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+                {returns.length > 0 && (
+                  <div className="p-4 bg-red-50 border-t border-red-100">
+                    <p className="text-sm font-semibold text-red-700">
+                      Jami qaytarilgan: {totalQuantityReturned} ta
+                    </p>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

@@ -917,6 +917,16 @@ export default function SupplierDetail() {
                 };
               })
           }
+          returns={
+            returns
+              .filter((returnItem) => returnItem.productId === salesProduct.id)
+              .map((returnItem) => ({
+                returnDate: returnItem.returnDate,
+                purchaseNumber: returnItem.purchaseNumber,
+                quantity: returnItem.quantity,
+                reason: returnItem.reasonText || returnItem.reason,
+              }))
+          }
         />
       )}
     </div>
