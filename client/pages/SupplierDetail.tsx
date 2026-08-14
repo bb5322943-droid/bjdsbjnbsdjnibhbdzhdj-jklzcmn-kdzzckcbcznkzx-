@@ -47,6 +47,8 @@ import {
   useSupplierFinancial,
   useSupplierKPI,
   useReturnProductToSupplier,
+  useOrders,
+  useCustomers,
 } from "@/hooks/use-api";
 import type {
   SupplierPurchase,
@@ -57,6 +59,7 @@ import type {
 } from "@shared/api";
 import { ProductReturnDialog } from "@/components/ProductReturnDialog";
 import { ProductHistoryDialog } from "@/components/ProductHistoryDialog";
+import { ProductSalesHistoryDialog } from "@/components/ProductSalesHistoryDialog";
 import { toast } from "sonner";
 
 /** Rating component */
@@ -121,6 +124,8 @@ export default function SupplierDetail() {
   const [selectedProduct, setSelectedProduct] = useState<SupplierProduct | null>(null);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<SupplierProduct | null>(null);
+  const [showSalesDialog, setShowSalesDialog] = useState(false);
+  const [salesProduct, setSalesProduct] = useState<SupplierProduct | null>(null);
 
   // API hooks
   const { data: detailData, isLoading: detailLoading } = useSupplierDetail(id!);
@@ -129,6 +134,8 @@ export default function SupplierDetail() {
   const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useSupplierProducts(id!);
   const { data: returnsData, isLoading: returnsLoading } = useSupplierReturns(id!);
   const { data: financialData, isLoading: financialLoading } = useSupplierFinancial(id!);
+  const { data: ordersData } = useOrders({ page: 1, limit: 1000 });
+  const { data: customersData } = useCustomers({ page: 1, limit: 1000 });
 
   const returnMutation = useReturnProductToSupplier();
 
@@ -143,6 +150,8 @@ export default function SupplierDetail() {
   const products = productsData?.data || [];
   const returns = returnsData?.data || [];
   const financial = financialData?.data || { summary: { totalPaid: 0, currentDebt: 0 }, history: [] };
+  const allOrders = ordersData?.data || [];
+  const allCustomers = customersData?.data || [];
 
   const handleProductReturn = async (data: {
     productId: string;
@@ -608,18 +617,31 @@ export default function SupplierDetail() {
                           {product.lastDeliveryDate || "—"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setShowReturnDialog(true);
-                            }}
-                            disabled={product.quantity === 0}
-                          >
-                            <PackageX className="mr-2 h-4 w-4" />
-                            Qaytarish
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSalesProduct(product);
+                                setShowSalesDialog(true);
+                              }}
+                            >
+                              <TrendingUp className="mr-2 h-4 w-4" />
+                              Sotuvlar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setShowReturnDialog(true);
+                              }}
+                              disabled={product.quantity === 0}
+                            >
+                              <PackageX className="mr-2 h-4 w-4" />
+                              Qaytarish
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -828,6 +850,72 @@ export default function SupplierDetail() {
                   }))
               )
               .filter((p) => p !== undefined) || []
+          }
+        />
+      )}
+
+      {/* Product Sales History Dialog */}
+      {salesProduct && (
+        <ProductSalesHistoryDialog
+          open={showSalesDialog}
+          onClose={() => {
+            setShowSalesDialog(false);
+            setSalesProduct(null);
+          }}
+          productName={salesProduct.name}
+          productCategory={salesProduct.category}
+          sales={
+            allOrders
+              .filter((order) =>
+                order.items?.some((item) => item.productId === salesProduct.id)
+              )
+              .map((order) => {
+                const orderItem = order.items?.find(
+                  (item) => item.productId === salesProduct.id
+                );
+                const customer = allCustomers.find(
+                  (c) => c.id === order.customerId
+                );
+                
+                // Xarid narxini topish
+                let costPrice = 0;
+                for (const purchase of purchases) {
+                  const purchaseItem = purchase.items?.find((item: PurchaseItem) => item.productId === salesProduct.id);
+                  if (purchaseItem) {
+                    costPrice = purchaseItem.cost;
+                    break;
+                  }
+                }
+                
+                return {
+                  orderNumber: order.orderNumber,
+                  orderDate: order.orderDate,
+                  quantity: orderItem?.quantity || 0,
+                  price: orderItem?.price || 0,
+                  total: (orderItem?.quantity || 0) * (orderItem?.price || 0),
+                  customerName: customer?.name || "Noma'lum",
+                  costPrice: costPrice,
+                };
+              })
+          }
+          purchases={
+            purchases
+              .filter((purchase) =>
+                purchase.items?.some((item: PurchaseItem) => item.productId === salesProduct.id)
+              )
+              .map((purchase) => {
+                const purchaseItem = purchase.items?.find(
+                  (item: PurchaseItem) => item.productId === salesProduct.id
+                );
+                return {
+                  purchaseNumber: purchase.purchaseNumber,
+                  purchaseDate: purchase.orderDate,
+                  supplierName: supplier?.name || "Noma'lum",
+                  quantity: purchaseItem?.quantity || 0,
+                  costPrice: purchaseItem?.cost || 0,
+                  total: (purchaseItem?.quantity || 0) * (purchaseItem?.cost || 0),
+                };
+              })
           }
         />
       )}
