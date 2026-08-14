@@ -1,4 +1,4 @@
-import { useState } from "react";
+  import { useState } from "react";
 import { Building2, Plus, User, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Customer } from "@shared/api";
@@ -14,6 +14,7 @@ import {
   CustomerDialog,
   CUSTOMER_TYPE_OPTIONS,
 } from "@/components/CustomerDialog";
+import { CustomerOrdersHistoryDialog } from "@/components/CustomerOrdersHistoryDialog";
 import {
   ErrorState,
   HeroStat,
@@ -39,6 +40,7 @@ import {
   useCustomerStats,
   useCustomers,
   useDeleteCustomer,
+  useOrders,
 } from "@/hooks/use-api";
 import { useDebounced } from "@/hooks/use-debounced";
 import { formatDate, formatNumber, formatUzPhone } from "@/lib/format";
@@ -57,11 +59,14 @@ export default function Customers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewing, setViewing] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState<Customer | null>(null);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
   const { data: statsData, isLoading: statsLoading } = useCustomerStats();
   const { data: regionsData } = useCustomerRegions();
+  const { data: ordersData } = useOrders({ page: 1, limit: 1000 }); // Barcha buyurtmalar
   const { data, isLoading, isError, error, refetch } = useCustomers({
     page,
     limit: 10,
@@ -76,6 +81,7 @@ export default function Customers() {
   const customers = data?.data ?? [];
   const pagination = data?.pagination;
   const regions = regionsData?.data ?? [];
+  const allOrders = ordersData?.data ?? [];
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -118,9 +124,17 @@ export default function Customers() {
             )}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-slate-700">
-              {customer.name}
-            </p>
+            <button
+              onClick={() => {
+                setHistoryCustomer(customer);
+                setShowHistoryDialog(true);
+              }}
+              className="text-left hover:text-[#173f38] transition-colors"
+            >
+              <p className="truncate text-sm font-bold text-slate-700 hover:underline">
+                {customer.name}
+              </p>
+            </button>
             <p className="mt-0.5 truncate text-xs text-slate-400">
               {customer.contactPerson || typeLabel(customer.type)}
             </p>
@@ -312,9 +326,17 @@ export default function Customers() {
                           )}
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-slate-700">
-                            {customer.name}
-                          </p>
+                          <button
+                            onClick={() => {
+                              setHistoryCustomer(customer);
+                              setShowHistoryDialog(true);
+                            }}
+                            className="text-left hover:text-[#173f38] transition-colors"
+                          >
+                            <p className="truncate font-bold text-slate-700 hover:underline">
+                              {customer.name}
+                            </p>
+                          </button>
                           <p className="truncate text-xs text-slate-400">
                             {typeLabel(customer.type)}
                           </p>
@@ -453,6 +475,31 @@ export default function Customers() {
         destructive
         onConfirm={handleDelete}
       />
+
+      {/* Customer Orders History Dialog */}
+      {historyCustomer && (
+        <CustomerOrdersHistoryDialog
+          open={showHistoryDialog}
+          onClose={() => {
+            setShowHistoryDialog(false);
+            setHistoryCustomer(null);
+          }}
+          customerName={historyCustomer.name}
+          customerPhone={historyCustomer.phone}
+          orders={
+            allOrders
+              .filter((order) => order.customerId === historyCustomer.id)
+              .map((order) => ({
+                orderNumber: order.orderNumber,
+                orderDate: order.orderDate,
+                itemsCount: order.items?.length || 0,
+                total: order.total,
+                paymentStatus: order.paymentStatus,
+                status: order.status,
+              }))
+          }
+        />
+      )}
     </>
   );
 }

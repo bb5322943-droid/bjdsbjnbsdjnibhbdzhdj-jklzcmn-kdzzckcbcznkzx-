@@ -19,6 +19,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DetailDialog } from "@/components/DetailDialog";
 import { ProductDialog } from "@/components/ProductDialog";
 import { StockAdjustDialog } from "@/components/StockAdjustDialog";
+import { ProductSalesHistoryDialog } from "@/components/ProductSalesHistoryDialog";
 import {
   ErrorState,
   HeroStat,
@@ -50,6 +51,8 @@ import {
   useRestockProducts,
   useStockMovements,
   useWarehouseStats,
+  useOrders,
+  useCustomers,
 } from "@/hooks/use-api";
 import { useDebounced } from "@/hooks/use-debounced";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,11 +74,15 @@ export default function Products() {
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
   const { data: statsData, isLoading: statsLoading } = useWarehouseStats();
   const { data: filtersData } = useProductFilters();
+  const { data: ordersData } = useOrders({ page: 1, limit: 1000 }); // Barcha buyurtmalar
+  const { data: customersData } = useCustomers({ page: 1, limit: 1000 }); // Barcha mijozlar
   const { data, isLoading, isError, error, refetch } = useProducts({
     page,
     limit: 10,
@@ -95,6 +102,8 @@ export default function Products() {
   const categories = filtersData?.data.categories ?? [];
   const locations = filtersData?.data.locations ?? [];
   const movements = movementsData?.data ?? [];
+  const allOrders = ordersData?.data ?? [];
+  const allCustomers = customersData?.data ?? [];
 
   const withPageReset =
     <T,>(setter: (value: T) => void) =>
@@ -144,9 +153,17 @@ export default function Products() {
       header: "Mahsulot",
       cell: (product) => (
         <div className="min-w-0 max-w-md">
-          <p className="truncate text-sm font-medium text-slate-900">
-            {product.name}
-          </p>
+          <button
+            onClick={() => {
+              setHistoryProduct(product);
+              setShowHistoryDialog(true);
+            }}
+            className="text-left hover:text-[#173f38] transition-colors"
+          >
+            <p className="truncate text-sm font-medium text-slate-900 hover:underline">
+              {product.name}
+            </p>
+          </button>
           <p className="mt-0.5 truncate text-xs text-slate-500">
             {product.category}
           </p>
@@ -399,9 +416,17 @@ export default function Products() {
 
                       {/* Product Name & Category */}
                       <div className="mb-3">
-                        <p className="truncate text-base font-bold text-slate-900 group-hover:text-[#173f38] transition-colors">
-                          {product.name}
-                        </p>
+                        <button
+                          onClick={() => {
+                            setHistoryProduct(product);
+                            setShowHistoryDialog(true);
+                          }}
+                          className="text-left hover:text-[#173f38] transition-colors"
+                        >
+                          <p className="truncate text-base font-bold text-slate-900 hover:underline group-hover:text-[#173f38] transition-colors">
+                            {product.name}
+                          </p>
+                        </button>
                         <p className="mt-1 truncate text-xs font-medium text-slate-500">
                           {product.category}
                         </p>
@@ -691,6 +716,41 @@ export default function Products() {
         confirmText="Buyurtma berish"
         onConfirm={handleRestock}
       />
+
+      {/* Product Sales History Dialog */}
+      {historyProduct && (
+        <ProductSalesHistoryDialog
+          open={showHistoryDialog}
+          onClose={() => {
+            setShowHistoryDialog(false);
+            setHistoryProduct(null);
+          }}
+          productName={historyProduct.name}
+          productCategory={historyProduct.category}
+          sales={
+            allOrders
+              .filter((order) =>
+                order.items?.some((item) => item.productId === historyProduct.id)
+              )
+              .map((order) => {
+                const orderItem = order.items?.find(
+                  (item) => item.productId === historyProduct.id
+                );
+                const customer = allCustomers.find(
+                  (c) => c.id === order.customerId
+                );
+                return {
+                  orderNumber: order.orderNumber,
+                  orderDate: order.orderDate,
+                  quantity: orderItem?.quantity || 0,
+                  price: orderItem?.price || 0,
+                  total: (orderItem?.quantity || 0) * (orderItem?.price || 0),
+                  customerName: customer?.name || "Noma'lum",
+                };
+              })
+          }
+        />
+      )}
     </>
   );
 }

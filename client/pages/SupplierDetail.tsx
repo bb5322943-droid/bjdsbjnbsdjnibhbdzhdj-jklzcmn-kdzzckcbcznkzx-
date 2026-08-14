@@ -56,6 +56,7 @@ import type {
   PurchaseItem,
 } from "@shared/api";
 import { ProductReturnDialog } from "@/components/ProductReturnDialog";
+import { ProductHistoryDialog } from "@/components/ProductHistoryDialog";
 import { toast } from "sonner";
 
 /** Rating component */
@@ -118,6 +119,8 @@ export default function SupplierDetail() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<SupplierProduct | null>(null);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [historyProduct, setHistoryProduct] = useState<SupplierProduct | null>(null);
 
   // API hooks
   const { data: detailData, isLoading: detailLoading } = useSupplierDetail(id!);
@@ -560,39 +563,67 @@ export default function SupplierDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product: SupplierProduct) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">
-                        {product.name}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {product.sku || `${product.category?.substring(0, 3).toUpperCase()}-${product.id}`}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {product.quantity} ta
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(product.price)} so'm
-                      </TableCell>
-                      <TableCell>
-                        {product.lastDeliveryDate || "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setShowReturnDialog(true);
-                          }}
-                          disabled={product.quantity === 0}
-                        >
-                          <PackageX className="mr-2 h-4 w-4" />
-                          Qaytarish
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredProducts.map((product: SupplierProduct) => {
+                    // Bu mahsulotning barcha xaridlarini topamiz
+                    const productPurchases = purchases
+                      .filter((purchase) =>
+                        purchase.items?.some((item: PurchaseItem) => item.productId === product.id)
+                      )
+                      .flatMap((purchase) =>
+                        purchase.items
+                          ?.filter((item: PurchaseItem) => item.productId === product.id)
+                          .map((item: PurchaseItem) => ({
+                            date: purchase.orderDate,
+                            quantity: item.quantity,
+                            price: item.cost || 0, // cost ishlatamiz!
+                            total: item.quantity * (item.cost || 0),
+                            purchaseNumber: purchase.purchaseNumber,
+                          }))
+                      )
+                      .filter((p) => p !== undefined) || [];
+
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">
+                          <button
+                            onClick={() => {
+                              setHistoryProduct(product);
+                              setShowHistoryDialog(true);
+                            }}
+                            className="text-left hover:text-[#173f38] hover:underline transition-colors"
+                          >
+                            {product.name}
+                          </button>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {product.sku || `${product.category?.substring(0, 3).toUpperCase()}-${product.id}`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {product.quantity} ta
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatNumber(product.price)} so'm
+                        </TableCell>
+                        <TableCell>
+                          {product.lastDeliveryDate || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setShowReturnDialog(true);
+                            }}
+                            disabled={product.quantity === 0}
+                          >
+                            <PackageX className="mr-2 h-4 w-4" />
+                            Qaytarish
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -767,6 +798,37 @@ export default function SupplierDetail() {
           products={products}
           defaultProductId={selectedProduct?.id}
           onSubmit={handleProductReturn}
+        />
+      )}
+
+      {/* Product History Dialog */}
+      {historyProduct && (
+        <ProductHistoryDialog
+          open={showHistoryDialog}
+          onClose={() => {
+            setShowHistoryDialog(false);
+            setHistoryProduct(null);
+          }}
+          productName={historyProduct.name}
+          productSku={historyProduct.sku || `${historyProduct.category?.substring(0, 3).toUpperCase()}-${historyProduct.id}`}
+          purchases={
+            purchases
+              .filter((purchase) =>
+                purchase.items?.some((item: PurchaseItem) => item.productId === historyProduct.id)
+              )
+              .flatMap((purchase) =>
+                purchase.items
+                  ?.filter((item: PurchaseItem) => item.productId === historyProduct.id)
+                  .map((item: PurchaseItem) => ({
+                    date: purchase.orderDate,
+                    quantity: item.quantity,
+                    price: item.cost || 0, // cost ishlatamiz, price emas!
+                    total: item.quantity * (item.cost || 0),
+                    purchaseNumber: purchase.purchaseNumber,
+                  }))
+              )
+              .filter((p) => p !== undefined) || []
+          }
         />
       )}
     </div>

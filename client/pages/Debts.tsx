@@ -20,6 +20,7 @@ import {
 import { DebtPaymentDialog } from "@/components/DebtPaymentDialog";
 import { DetailDialog } from "@/components/DetailDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { CustomerPaymentHistoryDialog } from "@/components/CustomerPaymentHistoryDialog";
 import {
   ErrorState,
   HeroStat,
@@ -50,6 +51,8 @@ export default function Debts() {
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] = useState(false);
+  const [paymentHistoryCustomer, setPaymentHistoryCustomer] = useState<CustomerDebt | null>(null);
 
   const debouncedSearch = useDebounced(search);
 
@@ -62,12 +65,16 @@ export default function Debts() {
   const { data: historyData } = useCustomerDebtHistory(
     viewingCustomer?.customerId || ""
   );
+  const { data: paymentHistoryData } = useCustomerDebtHistory(
+    paymentHistoryCustomer?.customerId || ""
+  );
   const clearDebt = useClearCustomerDebt();
 
   const stats = statsData?.data;
   const debts = data?.data ?? [];
   const pagination = data?.pagination;
   const history = historyData?.data;
+  const paymentHistory = paymentHistoryData?.data;
 
   const openPayment = (order: Order, paidAmount: number) => {
     setSelectedOrder(order);
@@ -110,9 +117,17 @@ export default function Debts() {
       header: "Mijoz",
       cell: (debt) => (
         <div>
-          <p className="text-sm font-semibold text-slate-900">
-            {debt.customerName}
-          </p>
+          <button
+            onClick={() => {
+              setPaymentHistoryCustomer(debt);
+              setShowPaymentHistoryDialog(true);
+            }}
+            className="text-left hover:text-[#173f38] transition-colors"
+          >
+            <p className="text-sm font-semibold text-slate-900 hover:underline">
+              {debt.customerName}
+            </p>
+          </button>
           <p className="mt-0.5 text-xs text-slate-500">
             {debt.orderCount} marta qarzga olgan
           </p>
@@ -486,6 +501,39 @@ export default function Debts() {
         confirmText="O'chirish"
         destructive
       />
+
+      {/* Customer Payment History Dialog */}
+      {paymentHistoryCustomer && paymentHistory && (
+        <CustomerPaymentHistoryDialog
+          open={showPaymentHistoryDialog}
+          onClose={() => {
+            setShowPaymentHistoryDialog(false);
+            setPaymentHistoryCustomer(null);
+          }}
+          customerName={paymentHistoryCustomer.customerName}
+          currentDebt={paymentHistoryCustomer.remainingDebt}
+          payments={[
+            // Qarzlar (orders)
+            ...paymentHistory.orders.map((order) => ({
+              date: formatDate(order.orderDate),
+              orderNumber: order.orderNumber,
+              type: 'order' as const,
+              amount: order.total,
+              balance: order.total,
+              note: `${order.items?.length || 0} ta mahsulot`,
+            })),
+            // To'lovlar (payments)
+            ...paymentHistory.payments.map((payment) => ({
+              date: formatDate(payment.paymentDate),
+              orderNumber: payment.orderNumber,
+              type: 'payment' as const,
+              amount: payment.amount,
+              balance: 0, // Balance hisoblash kerak bo'lsa
+              note: payment.paymentMethod,
+            })),
+          ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
+        />
+      )}
     </>
   );
 }
