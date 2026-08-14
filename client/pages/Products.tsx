@@ -744,10 +744,14 @@ export default function Products() {
                 );
                 
                 // Xarid narxini topish (eng so'nggi purchase dan)
-                const purchaseItem = allPurchases
-                  .flatMap(p => p.items || [])
-                  .filter(item => item.productId === historyProduct.id)
-                  .sort((a, b) => new Date(b.purchaseDate || 0).getTime() - new Date(a.purchaseDate || 0).getTime())[0];
+                let costPrice = 0;
+                for (const purchase of allPurchases) {
+                  const purchaseItem = purchase.items?.find(item => item.productId === historyProduct.id);
+                  if (purchaseItem) {
+                    costPrice = purchaseItem.cost;
+                    break; // Eng birinchisini olish (eng yangi)
+                  }
+                }
                 
                 return {
                   orderNumber: order.orderNumber,
@@ -756,7 +760,7 @@ export default function Products() {
                   price: orderItem?.price || 0,
                   total: (orderItem?.quantity || 0) * (orderItem?.price || 0),
                   customerName: customer?.name || "Noma'lum",
-                  costPrice: purchaseItem?.cost || 0,
+                  costPrice: costPrice,
                 };
               })
           }
