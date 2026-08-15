@@ -1204,6 +1204,11 @@ export function buildSeedData() {
   const customers = buildCustomers();
   const suppliers = buildSuppliers();
   const orders = buildOrders(customers, products, sellers);
+  const purchases = buildPurchases(suppliers, products, employees);
+
+  // MUHIM: Qoldiqlarni to'g'ri hisoblash
+  // Orders va purchases yaratilgandan KEYIN qoldiqlarni to'g'rilaymiz
+  adjustProductQuantities(products, orders, purchases);
 
   return {
     employees,
@@ -1212,7 +1217,7 @@ export function buildSeedData() {
     suppliers,
     branches: buildBranches(),
     orders,
-    purchases: buildPurchases(suppliers, products, employees),
+    purchases,
     invoices: buildInvoices(orders),
     attendance: buildAttendance(employees),
     leaveRequests: buildLeaveRequests(employees),
@@ -1223,4 +1228,55 @@ export function buildSeedData() {
     transactions: buildTransactions(salaryFund),
     activities: buildActivities(),
   };
+}
+
+/**
+ * Mahsulot qoldiqlarini orders va purchases asosida to'g'rilaydi
+ * Formula: final_quantity = initial_quantity + received_purchases - sold_orders
+ */
+function adjustProductQuantities(
+  products: Product[],
+  orders: Order[],
+  purchases: Purchase[],
+): void {
+  // Har bir mahsulot uchun jami xaridlar va sotishlarni hisoblaymiz
+  const productStats = new Map<string, { purchased: number; sold: number }>();
+
+  // Qabul qilingan xaridlarni hisoblaymiz (status === 'received')
+  purchases
+    .filter((p) => p.status === "received")
+    .forEach((purchase) => {
+      purchase.items.forEach((item) => {
+        const stats = productStats.get(item.productId) || { purchased: 0, sold: 0 };
+        stats.purchased += item.quantity;
+        productStats.set(item.productId, stats);
+      });
+    });
+
+  // Yetkazilgan buyurtmalarni hisoblaymiz (status === 'delivered' yoki 'shipped')
+  orders
+    .filter((o) => o.status === "delivered" || o.status === "shipped")
+    .forEach((order) => {
+      order.items.forEach((item) => {
+        const stats = productStats.get(item.productId) || { purchased: 0, sold: 0 };
+        stats.sold += item.quantity;
+        productStats.set(item.productId, stats);
+      });
+    });
+
+  // Har bir mahsulot uchun to'g'ri qoldiqni hisoblaymiz
+  products.forEach((product) => {
+    const stats = productStats.get(product.id);
+    if (stats) {
+      // Initial quantity + purchased - sold = final quantity
+      // Agar qoldiq 0 dan kam bo'lsa, initial quantity ni oshiramiz
+      const finalQuantity = product.quantity + stats.purchased - stats.sold;
+      if (finalQuantity < 0) {
+        // Initial quantity yetarli emas, oshiramiz
+        product.quantity = stats.sold - stats.purchased + product.minQuantity;
+      } else {
+        product.quantity = finalQuantity;
+      }
+    }
+  });
 }
