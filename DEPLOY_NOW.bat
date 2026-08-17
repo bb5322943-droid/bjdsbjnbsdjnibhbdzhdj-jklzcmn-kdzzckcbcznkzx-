@@ -1,20 +1,33 @@
 @echo off
+cls
 echo ========================================
 echo   FUSION ERP - VERCEL DEPLOY
 echo ========================================
 echo.
-
-echo 1. Vercel'ga login qiling...
-call vercel login
-
+echo Deployment boshlanyapti...
 echo.
-echo 2. Loyihani deploy qilyapman...
-call vercel --prod
-
+echo DIQQAT: Birinchi marta deploy qilayotgan bo'lsangiz:
+echo 1. Brauzerda Vercel login sahifasi ochiladi
+echo 2. Email yoki GitHub bilan login qiling
+echo 3. Sahifani yopib, bu oynaga qaytib keling
+echo 4. Enter tugmasini bosing
+echo.
+pause
+echo.
+echo Deployment jarayoni boshlandi...
+echo.
+cd /d "%~dp0"
+vercel --prod
 echo.
 echo ========================================
-echo   DEPLOY TUGALLANDI!
+echo   DEPLOYMENT TUGALLANDI!
 echo ========================================
 echo.
-echo Vercel sizga URL berdi. Brauzerda oching!
+echo Vercel sizga URL berdi (yuqorida ko'ring)
+echo URL ni nusxalab, brauzerda oching!
+echo.
+echo Login ma'lumotlar:
+echo Email: admin@fusion-erp.com
+echo Password: Admin123!@#
+echo.
 pause
