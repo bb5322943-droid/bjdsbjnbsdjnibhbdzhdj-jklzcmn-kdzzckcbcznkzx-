@@ -15,7 +15,9 @@ const DB_PATH = process.env.DATABASE_PATH
   ? resolve(process.env.DATABASE_PATH)
   : resolve(process.cwd(), "data", "app.db");
 
-const BACKUP_ENABLED = process.env.BACKUP_ENABLED === "true";
+// Production'da default enabled, SQLite uchun
+// PostgreSQL uchun external backup (managed service backup) ishlatiladi
+const BACKUP_ENABLED = process.env.BACKUP_ENABLED !== "false" && !process.env.DATABASE_URL;
 const BACKUP_SCHEDULE = process.env.BACKUP_SCHEDULE || "0 2 * * *"; // Har kuni soat 2:00 da
 const BACKUP_RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || "30");
 
@@ -25,7 +27,11 @@ const BACKUP_RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || "30"
  */
 export function startBackupScheduler(): void {
   if (!BACKUP_ENABLED) {
-    logger.info("Backup scheduler o'chirilgan (BACKUP_ENABLED=false)");
+    if (process.env.DATABASE_URL) {
+      logger.info("Backup scheduler o'chirilgan (PostgreSQL - managed backup ishlatiladi)");
+    } else {
+      logger.info("Backup scheduler o'chirilgan (BACKUP_ENABLED=false)");
+    }
     return;
   }
 
